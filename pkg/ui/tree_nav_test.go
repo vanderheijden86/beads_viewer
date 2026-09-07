@@ -34,27 +34,25 @@ func cleanTreeState(t *testing.T) {
 
 func createNavTestIssues() []model.Issue {
 	now := time.Now()
-	// CreatedAt values are set so that default sort (Created desc) produces
-	// the expected display order: epic-1, task-1, task-2, task-3,
-	// standalone-1, standalone-2 (bd-2ty).
+	// Creation dates order the roots; numbered titles order epic children.
 	return []model.Issue{
 		{ID: "epic-1", Title: "Epic One", Status: model.StatusOpen, Priority: 1, IssueType: model.TypeEpic, CreatedAt: now.Add(5 * time.Second)},
 		{
-			ID: "task-1", Title: "Task One", Status: model.StatusOpen, Priority: 2, IssueType: model.TypeTask,
+			ID: "task-1", Title: "Task 1", Status: model.StatusOpen, Priority: 2, IssueType: model.TypeTask,
 			CreatedAt: now.Add(4 * time.Second),
 			Dependencies: []*model.Dependency{
 				{IssueID: "task-1", DependsOnID: "epic-1", Type: model.DepParentChild},
 			},
 		},
 		{
-			ID: "task-2", Title: "Task Two", Status: model.StatusOpen, Priority: 2, IssueType: model.TypeTask,
+			ID: "task-2", Title: "Task 2", Status: model.StatusOpen, Priority: 2, IssueType: model.TypeTask,
 			CreatedAt: now.Add(3 * time.Second),
 			Dependencies: []*model.Dependency{
 				{IssueID: "task-2", DependsOnID: "epic-1", Type: model.DepParentChild},
 			},
 		},
 		{
-			ID: "task-3", Title: "Task Three", Status: model.StatusOpen, Priority: 2, IssueType: model.TypeTask,
+			ID: "task-3", Title: "Task 3", Status: model.StatusOpen, Priority: 2, IssueType: model.TypeTask,
 			CreatedAt: now.Add(2 * time.Second),
 			Dependencies: []*model.Dependency{
 				{IssueID: "task-3", DependsOnID: "epic-1", Type: model.DepParentChild},
@@ -186,11 +184,11 @@ func TestTreeNavLastSibling(t *testing.T) {
 
 // createDeepTreeIssues creates a 3-level hierarchy for visibility cycling tests.
 //
-//   epic-1 (depth 0)
-//     task-1 (depth 1, child of epic-1)
-//       subtask-1 (depth 2, child of task-1)
-//     task-2 (depth 1, child of epic-1)
-//   standalone-1 (depth 0)
+//	epic-1 (depth 0)
+//	  task-1 (depth 1, child of epic-1)
+//	    subtask-1 (depth 2, child of task-1)
+//	  task-2 (depth 1, child of epic-1)
+//	standalone-1 (depth 0)
 func createDeepTreeIssues() []model.Issue {
 	now := time.Now()
 	// CreatedAt values are set so that default sort (Created desc) produces

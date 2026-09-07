@@ -635,16 +635,63 @@ func (t *TreeModel) GetSortDirection() SortDirection {
 // sortAllSiblings walks the entire tree and sorts children at each level (bd-adf).
 func (t *TreeModel) sortAllSiblings() {
 	t.sortNodesByFieldDirection(t.roots)
-	var walk func(nodes []*IssueTreeNode)
-	walk = func(nodes []*IssueTreeNode) {
+	var walk func(nodes []*IssueTreeNode, inEpic bool)
+	walk = func(nodes []*IssueTreeNode, inEpic bool) {
 		for _, node := range nodes {
+			withinEpic := inEpic || (node.Issue != nil && node.Issue.IssueType == model.TypeEpic)
 			if len(node.Children) > 1 {
-				t.sortNodesByFieldDirection(node.Children)
+				if t.sortField == SortFieldCreated && withinEpic {
+					sort.Slice(node.Children, func(i, j int) bool {
+						a, b := node.Children[i].Issue, node.Children[j].Issue
+						if a == nil || b == nil {
+							return a != nil
+						}
+						if cmp := compareNaturalTitle(a.Title, b.Title); cmp != 0 {
+							return cmp < 0
+						}
+						return a.ID < b.ID
+					})
+				} else {
+					t.sortNodesByFieldDirection(node.Children)
+				}
 			}
-			walk(node.Children)
+			walk(node.Children, withinEpic)
 		}
 	}
-	walk(t.roots)
+	walk(t.roots, false)
+}
+
+// compareNaturalTitle compares digit runs by magnitude without integer overflow.
+func compareNaturalTitle(a, b string) int {
+	a, b = strings.ToLower(a), strings.ToLower(b)
+	for len(a) > 0 && len(b) > 0 {
+		if a[0] >= '0' && a[0] <= '9' && b[0] >= '0' && b[0] <= '9' {
+			i, j := 0, 0
+			for i < len(a) && a[i] >= '0' && a[i] <= '9' {
+				i++
+			}
+			for j < len(b) && b[j] >= '0' && b[j] <= '9' {
+				j++
+			}
+			x, y := strings.TrimLeft(a[:i], "0"), strings.TrimLeft(b[:j], "0")
+			if len(x) < len(y) {
+				return -1
+			}
+			if len(x) > len(y) {
+				return 1
+			}
+			if cmp := strings.Compare(x, y); cmp != 0 {
+				return cmp
+			}
+			a, b = a[i:], b[j:]
+			continue
+		}
+		if a[0] != b[0] {
+			return strings.Compare(a[:1], b[:1])
+		}
+		a, b = a[1:], b[1:]
+	}
+	return strings.Compare(a, b)
 }
 
 // sortNodesByFieldDirection sorts a slice of sibling nodes using the current

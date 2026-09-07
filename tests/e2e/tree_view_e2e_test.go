@@ -243,6 +243,46 @@ func TestTreeViewEnterAndExit(t *testing.T) {
 	containsAll(t, out, []string{"epic-1", "task-1"})
 }
 
+func TestTreeViewCreatedSortNumberedChildren(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now()
+	issues := []treeFixtureIssue{
+		{ID: "epic-old", Title: "OlderEpic", Status: "open", IssueType: "epic", CreatedAt: now.Add(-time.Hour).Format(time.RFC3339)},
+		{ID: "epic-new", Title: "NewerEpic", Status: "open", IssueType: "epic", CreatedAt: now.Format(time.RFC3339)},
+	}
+	for _, n := range []int{10, 2, 1} {
+		id := fmt.Sprintf("child-%d", n)
+		issues = append(issues, treeFixtureIssue{ID: id, Title: fmt.Sprintf("[szgb.%d] OrderedStep", n), Status: "open", IssueType: "task",
+			CreatedAt:    now.Add(time.Duration(n) * time.Minute).Format(time.RFC3339),
+			Dependencies: []*treeFixtureDep{{IssueID: id, DependsOnID: "epic-new", Type: "parent-child"}}})
+	}
+	writeTreeFixture(t, dir, issues)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	// The captured terminal needs dimensions for Bubble Tea to render a frame.
+	binary := "'" + strings.ReplaceAll(buildBvBinary(t), "'", "'\\''") + "'"
+	cmd := scriptTUICommand(ctx, "/bin/sh", "-c", "stty rows 40 cols 160; exec "+binary)
+	if cmd == nil {
+		t.Fatal("script PTY is required for the sorting regression")
+	}
+	cmd.Dir = dir
+	// A captured PTY has no emulator to answer OSC color queries.
+	cmd.Env = append(os.Environ(), "TERM=screen-256color", "B9S_TUI_AUTOCLOSE_MS=2500")
+	ensureCmdStdinCloses(t, ctx, cmd, 6*time.Second)
+	out, err := runCmdToFile(t, cmd)
+	if err != nil {
+		t.Fatalf("TUI failed: %v\n%s", err, out)
+	}
+	last := -1
+	for _, title := range []string{"NewerEpic", "[szgb.1] OrderedStep", "[szgb.2] OrderedStep", "[szgb.10] OrderedStep", "OlderEpic"} {
+		pos := strings.Index(string(out), title)
+		if pos <= last {
+			t.Fatalf("expected %q after position %d, got %d\n%s", title, last, pos, out)
+		}
+		last = pos
+	}
+}
+
 // TestTreeViewShowsHierarchy verifies that the tree view displays the parent-child
 // hierarchy with branch characters and proper nesting.
 func TestTreeViewShowsHierarchy(t *testing.T) {
@@ -329,8 +369,8 @@ func TestTreeViewToggleExpand(t *testing.T) {
 	// First collapse all, then navigate to epic-1 and expand it
 	out, err := runTreeTUI(t, tempDir, 3500, []keyStep{
 		// Tree view is the default on launch (bd-dxc)
-		k("Z"),    // Collapse all
-		k(" "),    // Toggle expand on first node (epic-1, which is selected by default)
+		k("Z"), // Collapse all
+		k(" "), // Toggle expand on first node (epic-1, which is selected by default)
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
@@ -351,9 +391,9 @@ func TestTreeViewNavigation(t *testing.T) {
 
 	out, err := runTreeTUI(t, tempDir, 3000, []keyStep{
 		// Tree view is the default on launch (bd-dxc)
-		k("j"),  // Move down
-		k("j"),  // Move down again
-		k("k"),  // Move up
+		k("j"), // Move down
+		k("j"), // Move down again
+		k("k"), // Move up
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
@@ -508,8 +548,8 @@ func TestTreeViewFilterEscClears(t *testing.T) {
 
 	out, err := runTreeTUI(t, tempDir, 3500, []keyStep{
 		// Tree view is the default on launch (bd-dxc)
-		k("c"),       // Filter: closed only
-		k("\x1b"),    // ESC: should clear filter (not exit tree view)
+		k("c"),    // Filter: closed only
+		k("\x1b"), // ESC: should clear filter (not exit tree view)
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
@@ -530,15 +570,15 @@ func TestTreeViewSearch(t *testing.T) {
 
 	out, err := runTreeTUI(t, tempDir, 3500, []keyStep{
 		// Tree view is the default on launch (bd-dxc)
-		k("X"),  // Expand all
-		k("/"),  // Enter search mode
-		kd("S", 50 * time.Millisecond),
-		kd("u", 50 * time.Millisecond),
-		kd("b", 50 * time.Millisecond),
-		kd("t", 50 * time.Millisecond),
-		kd("a", 50 * time.Millisecond),
-		kd("s", 50 * time.Millisecond),
-		kd("k", 50 * time.Millisecond),
+		k("X"), // Expand all
+		k("/"), // Enter search mode
+		kd("S", 50*time.Millisecond),
+		kd("u", 50*time.Millisecond),
+		kd("b", 50*time.Millisecond),
+		kd("t", 50*time.Millisecond),
+		kd("a", 50*time.Millisecond),
+		kd("s", 50*time.Millisecond),
+		kd("k", 50*time.Millisecond),
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
@@ -562,13 +602,13 @@ func TestTreeViewSearchByID(t *testing.T) {
 
 	out, err := runTreeTUI(t, tempDir, 3500, []keyStep{
 		// Tree view is the default on launch (bd-dxc)
-		k("/"),  // Enter search mode
-		kd("e", 50 * time.Millisecond),
-		kd("p", 50 * time.Millisecond),
-		kd("i", 50 * time.Millisecond),
-		kd("c", 50 * time.Millisecond),
-		kd("-", 50 * time.Millisecond),
-		kd("2", 50 * time.Millisecond),
+		k("/"), // Enter search mode
+		kd("e", 50*time.Millisecond),
+		kd("p", 50*time.Millisecond),
+		kd("i", 50*time.Millisecond),
+		kd("c", 50*time.Millisecond),
+		kd("-", 50*time.Millisecond),
+		kd("2", 50*time.Millisecond),
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
@@ -755,9 +795,9 @@ func TestTreeViewArrowDownNavigation(t *testing.T) {
 	// Use arrow down to navigate in tree view (default on launch)
 	out, err := runTreeTUI(t, tempDir, 3000, []keyStep{
 		// Tree view is the default on launch (bd-dxc)
-		k(arrowDown),    // Arrow Down
-		k(arrowDown),    // Arrow Down again
-		k(arrowUp),      // Arrow Up
+		k(arrowDown), // Arrow Down
+		k(arrowDown), // Arrow Down again
+		k(arrowUp),   // Arrow Up
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
@@ -806,7 +846,7 @@ func TestTreeViewArrowLeftCollapsesNode(t *testing.T) {
 
 	out, err := runTreeTUI(t, tempDir, 3000, []keyStep{
 		// Tree view is the default on launch (bd-dxc); epic-1 is selected, auto-expanded
-		k(arrowLeft),    // Should collapse epic-1
+		k(arrowLeft), // Should collapse epic-1
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
@@ -824,8 +864,8 @@ func TestTreeViewArrowRightExpandsNode(t *testing.T) {
 
 	out, err := runTreeTUI(t, tempDir, 3000, []keyStep{
 		// Tree view is the default on launch (bd-dxc)
-		k("Z"),          // Collapse all
-		k(arrowRight),   // Expand epic-1 (selected by default)
+		k("Z"),        // Collapse all
+		k(arrowRight), // Expand epic-1 (selected by default)
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
@@ -844,14 +884,14 @@ func TestTreeViewArrowKeysOnlyNavigation(t *testing.T) {
 
 	out, err := runTreeTUI(t, tempDir, 4000, []keyStep{
 		// Tree view is the default on launch (bd-dxc)
-		k(arrowDown),              // Move to task-1
-		k(arrowDown),              // Move to task-2
-		k(arrowUp),                // Back to task-1
-		k(arrowUp),                // Back to epic-1
-		k(arrowLeft),              // Collapse epic-1
+		k(arrowDown),                         // Move to task-1
+		k(arrowDown),                         // Move to task-2
+		k(arrowUp),                           // Back to task-1
+		k(arrowUp),                           // Back to epic-1
+		k(arrowLeft),                         // Collapse epic-1
 		kd(arrowRight, 200*time.Millisecond), // Expand epic-1
-		k(arrowRight),             // Move into first child (task-1)
-		k(arrowDown),              // Move to task-2
+		k(arrowRight),                        // Move into first child (task-1)
+		k(arrowDown),                         // Move to task-2
 	})
 	if err != nil {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
