@@ -7,9 +7,8 @@ import (
 	"time"
 )
 
-// DoltWatcher polls a Dolt database for changes using HASHOF('HEAD').
-// It monitors the HEAD commit hash at a configurable interval and notifies
-// callers when it detects a new commit.
+// DoltWatcher polls a Dolt database for working-set content changes. It
+// notifies callers for both committed and uncommitted writes.
 type DoltWatcher struct {
 	reader       *DoltReader
 	pollInterval time.Duration
@@ -47,8 +46,7 @@ func NewDoltWatcher(source DataSource, pollInterval time.Duration) (*DoltWatcher
 	}, nil
 }
 
-// Start begins polling for Dolt HEAD hash changes. It captures the current
-// hash as a baseline (without triggering a notification) and then launches the
+// Start captures the current database hash as a baseline and launches the
 // background poll goroutine. Calling Start on an already-started watcher is a
 // no-op.
 func (w *DoltWatcher) Start() error {
@@ -60,7 +58,7 @@ func (w *DoltWatcher) Start() error {
 	}
 
 	// Establish baseline hash — do not notify on first observation.
-	hash, err := w.reader.GetHeadHash()
+	hash, err := w.reader.GetDatabaseHash()
 	if err != nil {
 		// Non-fatal: proceed without a baseline; the first successful poll will
 		// set it without triggering a spurious notification.
@@ -89,13 +87,13 @@ func (w *DoltWatcher) Stop() {
 }
 
 // Changed returns a channel that receives an empty struct whenever the Dolt
-// HEAD hash changes. The channel has a buffer of 1; rapid consecutive changes
-// will be coalesced into a single notification.
+// database hash changes. The channel has a buffer of 1; rapid consecutive
+// changes will be coalesced into a single notification.
 func (w *DoltWatcher) Changed() <-chan struct{} {
 	return w.changeCh
 }
 
-// SetOnChange registers a callback to invoke when the HEAD hash changes. The
+// SetOnChange registers a callback to invoke when the database hash changes. The
 // callback is called from the poll goroutine and should not block.
 func (w *DoltWatcher) SetOnChange(fn func()) {
 	w.mu.Lock()
@@ -109,9 +107,8 @@ func (w *DoltWatcher) IsPolling() bool {
 	return true
 }
 
-// poll is the background goroutine that ticks at pollInterval and compares the
-// current HEAD hash to the last known hash. It terminates when the context is
-// cancelled.
+// poll compares the current working-set content hash to the last known hash.
+// It terminates when the context is cancelled.
 func (w *DoltWatcher) poll() {
 	ticker := time.NewTicker(w.pollInterval)
 	defer ticker.Stop()
@@ -122,7 +119,7 @@ func (w *DoltWatcher) poll() {
 			return
 
 		case <-ticker.C:
-			hash, err := w.reader.GetHeadHash()
+			hash, err := w.reader.GetDatabaseHash()
 			if err != nil {
 				// Transient error — skip and retry next tick.
 				continue

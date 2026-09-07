@@ -29,7 +29,7 @@ B9s takes the opposite approach: **do fewer things well**. By stripping the code
 - **Inline editing** of title, status, priority, type, assignee, labels, description, and notes (via huh forms)
 - **Issue creation** directly from the TUI (`Ctrl+n`)
 - **Label filtering** with count display
-- **Live reload** on file changes (filesystem watcher with debounce + optional background snapshot loading)
+- **Live reload** for JSONL file changes and Dolt working-set changes, with `Ctrl+R` / `F5` manual refresh
 - **Self-updating** (`--update`, `--check-update`, `--rollback`)
 - **Repository prefix filtering** (`--repo`)
 - **Large dataset handling** with tiered loading and issue pooling for 1k-20k+ issues
@@ -83,7 +83,7 @@ When multiple backends are present, B9s picks the highest-priority source:
 
 | Priority | Backend | Source | Description |
 |----------|---------|--------|-------------|
-| **110** | Dolt (server mode) | `metadata.json` with `dolt_mode: "server"` | MySQL-compatible Dolt database via TCP. Supports concurrent writers, push/pull replication, and live change detection via `HASHOF('HEAD')` polling. |
+| **110** | Dolt (server mode) | `metadata.json` with `dolt_mode: "server"` | MySQL-compatible Dolt database via TCP. Supports concurrent writers and live change detection via `DOLT_HASHOF_DB()` working-set polling. |
 | **100** | SQLite | `.beads/beads.db` | Legacy SQLite database from older `bd` versions. Read-only in B9s. |
 | **80** | JSONL (worktree) | `.beads/issues.jsonl` in git worktrees | JSONL files discovered in linked git worktrees. |
 | **50** | JSONL (local) | `.beads/issues.jsonl` | Flat-file JSONL. The original Beads storage format. |
@@ -93,6 +93,15 @@ Selection is **priority-first**, not freshness-first. When Dolt is configured, i
 ### Dolt Server Mode
 
 The primary backend. Connects to a Dolt SQL server (self-hosted or [DoltHub](https://www.dolthub.com/)) via the MySQL wire protocol. Supports concurrent multi-agent access, push/pull replication, and live reload.
+
+B9s polls the Dolt working-set hash, so uncommitted issue changes made by `bd` or another agent appear automatically. This deliberately avoids a database change stream or WebSocket layer. The default interval is 500 milliseconds and can be changed in `~/.config/b9s/config.yaml`:
+
+```yaml
+refresh:
+  poll_interval: 2s
+```
+
+The minimum interval is 100 milliseconds. Restart B9s after changing the setting. Press `Ctrl+R` or `F5` at any time to refresh immediately.
 
 ```bash
 # Initialize a new project with a remote Dolt server
@@ -172,6 +181,7 @@ If B9s cannot connect to the configured Dolt server, it falls back to the next a
 | `/` | Fuzzy search | `s` | Cycle sort mode |
 | `n` / `N` | Next / Prev match | `l` | Label picker |
 | `o` / `c` / `r` / `a` | Filter: Open / Closed / Ready / All | `d` | Toggle detail panel |
+| `Ctrl+R` / `F5` | Refresh data immediately | `?` | Show help |
 
 | Key | Action |
 |-----|--------|

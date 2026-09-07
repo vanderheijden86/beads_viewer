@@ -437,6 +437,15 @@ In complex software projects, tasks are not isolated. They are deeply interconne
 
 Reliability is key. `bw` doesn't assume a perfect environment; it actively handles common file system inconsistencies.
 
+The active datasource determines how changes are detected:
+
+- JSONL sources use filesystem events with a polling fallback.
+- Dolt server sources poll `DOLT_HASHOF_DB()`, which fingerprints the current working set rather than only committed `HEAD`. Issue writes from `bd` and other agents therefore trigger reloads without requiring a Dolt commit.
+- The default Dolt polling interval is 500 milliseconds and is configurable through `refresh.poll_interval` in `~/.config/b9s/config.yaml`.
+- `Ctrl+R` and `F5` bypass the automatic interval and request an immediate reload.
+
+This is intentionally a small polling boundary. B9s does not run a database change stream or a WebSocket service.
+
 ### 1. Intelligent Path Discovery
 The loader (`pkg/loader/loader.go`) doesn't just blindly open `.beads/beads.jsonl`. It employs a priority-based discovery algorithm:
 1.  **Canonical:** Checks for `issues.jsonl` (preferred by beads upstream).

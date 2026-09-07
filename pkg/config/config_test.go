@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -17,6 +18,9 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if cfg.Discovery.MaxDepth != 3 {
 		t.Errorf("expected max depth 3, got %d", cfg.Discovery.MaxDepth)
+	}
+	if got := time.Duration(cfg.Refresh.PollInterval); got != 500*time.Millisecond {
+		t.Errorf("expected refresh poll interval 500ms, got %s", got)
 	}
 	if cfg.Favorites == nil {
 		t.Error("expected favorites map to be initialized")
@@ -56,6 +60,9 @@ discovery:
   scan_paths:
     - ~/work
   max_depth: 2
+
+refresh:
+  poll_interval: 2s
 `
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
@@ -97,6 +104,33 @@ discovery:
 	}
 	if cfg.Discovery.MaxDepth != 2 {
 		t.Errorf("expected max_depth 2, got %d", cfg.Discovery.MaxDepth)
+	}
+	if got := time.Duration(cfg.Refresh.PollInterval); got != 2*time.Second {
+		t.Errorf("expected poll_interval 2s, got %s", got)
+	}
+}
+
+func TestLoadFrom_InvalidRefreshPollInterval(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("refresh:\n  poll_interval: eventually\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := LoadFrom(path); err == nil {
+		t.Fatal("expected invalid refresh poll interval to fail config loading")
+	}
+}
+
+func TestLoadFrom_RefreshPollIntervalRejectsBusyLoop(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("refresh:\n  poll_interval: 10ms\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := LoadFrom(path); err == nil {
+		t.Fatal("expected refresh poll interval below 100ms to fail config loading")
 	}
 }
 

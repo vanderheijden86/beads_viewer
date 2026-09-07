@@ -156,6 +156,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Load application config before constructing watchers so the configured
+	// refresh interval applies from the first poll.
+	appCfg, cfgErr := config.Load()
+	if cfgErr != nil {
+		appCfg = config.DefaultConfig()
+	}
+
 	// Get beads file path for live reload (respects BEADS_DIR env var)
 	beadsDir, _ := loader.GetBeadsDir("")
 	beadsPath, _ := loader.FindJSONLPath(beadsDir)
@@ -187,7 +194,7 @@ func main() {
 				}
 				doltLabel := fmt.Sprintf("dolt://%s/%s", s.Path, db)
 				debug.Log("datasource: attempting Dolt connection to %s", doltLabel)
-				dw, dwErr := datasource.NewDoltWatcher(sources[i], 500*time.Millisecond)
+				dw, dwErr := datasource.NewDoltWatcher(sources[i], appCfg.RefreshPollInterval())
 				if dwErr != nil {
 					debug.Log("datasource: Dolt watcher creation failed: %v", dwErr)
 					doltFailure = &ui.DoltFailure{
@@ -241,13 +248,6 @@ func main() {
 	if len(issues) == 0 {
 		fmt.Println("No issues found. Create some with 'bd create'!")
 		os.Exit(0)
-	}
-
-	// Load bw config for project switching, favorites, and experimental flags
-	appCfg, cfgErr := config.Load()
-	if cfgErr != nil {
-		// Non-fatal: continue without config
-		appCfg = config.DefaultConfig()
 	}
 
 	// Background mode rollout:

@@ -818,6 +818,64 @@ func TestDoltIntegration_WatcherDetectsChange(t *testing.T) {
 	}
 }
 
+func TestDoltIntegration_WatcherDetectsUncommittedWorkingSetChange(t *testing.T) {
+	skipIfNoDoltIntegration(t)
+	dbName, addr, cleanup := testDB(t)
+	defer cleanup()
+
+	user := os.Getenv("B9S_TEST_DOLT_USER")
+	if user == "" {
+		user = "root"
+	}
+
+	source := DataSource{
+		Type:     SourceTypeDolt,
+		Path:     addr,
+		Database: dbName,
+		User:     user,
+	}
+	dw, err := NewDoltWatcher(source, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("NewDoltWatcher failed: %v", err)
+	}
+	defer dw.Stop()
+	if err := dw.Start(); err != nil {
+		t.Fatalf("watcher Start failed: %v", err)
+	}
+
+	reader := newTestDoltReader(t, dbName, addr)
+	defer reader.Close()
+	headBefore, err := reader.GetHeadHash()
+	if err != nil {
+		t.Fatalf("GetHeadHash before mutation failed: %v", err)
+	}
+
+	dsn := buildDSN(user, os.Getenv("BEADS_DOLT_PASSWORD"), addr, dbName)
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatalf("cannot open mutation connection: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO issues (id, title, status, priority, issue_type, created_at, updated_at)
+		VALUES ('test-working-set', 'Uncommitted issue', 'open', 2, 'task', NOW(), NOW())`); err != nil {
+		t.Fatalf("insert failed: %v", err)
+	}
+
+	headAfter, err := reader.GetHeadHash()
+	if err != nil {
+		t.Fatalf("GetHeadHash after mutation failed: %v", err)
+	}
+	if headBefore != headAfter {
+		t.Fatal("test setup committed the mutation; expected HEAD to remain unchanged")
+	}
+
+	select {
+	case <-dw.Changed():
+	case <-time.After(2 * time.Second):
+		t.Fatal("watcher did not detect the uncommitted working-set change")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Test: Write-then-read cycle (simulates b9s edit flow)
 // ---------------------------------------------------------------------------

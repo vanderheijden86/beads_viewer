@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/vanderheijden86/beadwork/pkg/model"
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/vanderheijden86/beadwork/pkg/model"
 )
 
 type badItem struct{}
@@ -41,6 +42,28 @@ func TestUpdateFileChangedReloadsSelection(t *testing.T) {
 	m2 := updated.(Model)
 	if m2.statusIsError {
 		t.Fatalf("expected successful reload, got error %q", m2.statusMsg)
+	}
+}
+
+func TestCtrlRRequestsImmediateRefresh(t *testing.T) {
+	tmp := t.TempDir()
+	beads := filepath.Join(tmp, "beads.jsonl")
+	if err := os.WriteFile(beads, []byte(`{"id":"ONE","title":"One","status":"open"}`+"\n"), 0o644); err != nil {
+		t.Fatalf("write beads: %v", err)
+	}
+
+	m := NewModel(nil, beads)
+	if m.watcher != nil {
+		defer m.watcher.Stop()
+	}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	m2 := updated.(Model)
+	if cmd == nil {
+		t.Fatal("expected Ctrl+R to request a refresh")
+	}
+	if m2.statusIsError || m2.statusMsg != "Refreshing…" {
+		t.Fatalf("expected refreshing status, got error=%v message=%q", m2.statusIsError, m2.statusMsg)
 	}
 }
 

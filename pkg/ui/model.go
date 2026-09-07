@@ -197,7 +197,7 @@ type UpdateMsg struct {
 	URL     string
 }
 
-// FileChangedMsg is sent when the beads file changes on disk
+// FileChangedMsg is sent when the active datasource changes.
 type FileChangedMsg struct{}
 
 // semanticDebounceTickMsg is sent after debounce delay to trigger semantic computation
@@ -257,7 +257,7 @@ func WatchFileCmd(w *watcher.Watcher) tea.Cmd {
 	}
 }
 
-// DoltWatchCmd returns a command that waits for Dolt database changes and sends FileChangedMsg
+// DoltWatchCmd returns a command that waits for Dolt database changes and sends FileChangedMsg.
 func DoltWatchCmd(w *datasource.DoltWatcher) tea.Cmd {
 	return func() tea.Msg {
 		<-w.Changed()
@@ -316,33 +316,34 @@ type DoltFailure struct {
 
 // DatabaseHealth holds the result of a database / data source health check.
 type DatabaseHealth struct {
-	Backend    string        // e.g. "Dolt (MySQL protocol)", "JSONL (flat file)", "SQLite"
-	Server     string        // host:port (Dolt only)
-	Database   string        // database name (Dolt only)
-	User       string        // connection user (Dolt only)
-	FilePath   string        // file path (JSONL / SQLite only)
-	FileSize   string        // human-readable file size (JSONL / SQLite only)
-	Connected  bool          // true when ping succeeded (Dolt only)
-	Latency    time.Duration // round-trip latency for the connection ping (Dolt only)
-	HeadHash   string        // Dolt HEAD commit hash (truncated)
-	IssueCount int           // non-tombstone issue count
-	Error       string       // error message when connection failed
-	DoltAttempt *DoltFailure // non-nil when Dolt was configured but connection failed (fallback mode)
+	Backend     string        // e.g. "Dolt (MySQL protocol)", "JSONL (flat file)", "SQLite"
+	Server      string        // host:port (Dolt only)
+	Database    string        // database name (Dolt only)
+	User        string        // connection user (Dolt only)
+	FilePath    string        // file path (JSONL / SQLite only)
+	FileSize    string        // human-readable file size (JSONL / SQLite only)
+	Connected   bool          // true when ping succeeded (Dolt only)
+	Latency     time.Duration // round-trip latency for the connection ping (Dolt only)
+	HeadHash    string        // Dolt HEAD commit hash (truncated)
+	IssueCount  int           // non-tombstone issue count
+	Error       string        // error message when connection failed
+	DoltAttempt *DoltFailure  // non-nil when Dolt was configured but connection failed (fallback mode)
 }
 
 // Model is the main Bubble Tea model for b9s
 type Model struct {
 	// Data
-	issues       []model.Issue
-	pooledIssues []*model.Issue // Issue pool refs for sync reloads (return to pool on replace)
-	issueMap     map[string]*model.Issue
-	beadsPath    string           // Path to beads.jsonl for reloading
-	watcher      *watcher.Watcher // File watcher for live reload
-	doltWatcher  *datasource.DoltWatcher // Dolt polling watcher for live reload
-	sourceType   datasource.SourceType   // What backend we loaded from
-	sourceInfo   string                  // Human-readable datasource description for title bar
-	doltSource   datasource.DataSource   // Dolt DataSource used for on-demand health checks
-	doltFailure  *DoltFailure            // Non-nil when Dolt was detected but connection failed
+	issues           []model.Issue
+	pooledIssues     []*model.Issue // Issue pool refs for sync reloads (return to pool on replace)
+	issueMap         map[string]*model.Issue
+	beadsPath        string                  // Path to beads.jsonl for reloading
+	watcher          *watcher.Watcher        // File watcher for live reload
+	doltWatcher      *datasource.DoltWatcher // Dolt polling watcher for live reload
+	sourceType       datasource.SourceType   // What backend we loaded from
+	sourceInfo       string                  // Human-readable datasource description for title bar
+	doltSource       datasource.DataSource   // Dolt DataSource used for on-demand health checks
+	doltFailure      *DoltFailure            // Non-nil when Dolt was detected but connection failed
+	doltPollInterval time.Duration           // Configured Dolt live-refresh interval
 
 	// Background Worker (Phase 2 architecture - bv-m7v8)
 	// snapshot is the current immutable data snapshot from BackgroundWorker.
@@ -362,12 +363,12 @@ type Model struct {
 	lastForceRefresh time.Time
 
 	// UI Components
-	list             list.Model
-	viewport         viewport.Model
-	renderer         *MarkdownRenderer
-	board BoardModel
-	tree  TreeModel // Hierarchical tree view (bv-gllx)
-	theme            Theme
+	list     list.Model
+	viewport viewport.Model
+	renderer *MarkdownRenderer
+	board    BoardModel
+	tree     TreeModel // Hierarchical tree view (bv-gllx)
+	theme    Theme
 
 	// Update State
 	updateAvailable bool
@@ -376,10 +377,10 @@ type Model struct {
 
 	// Focus and View State
 	focused              focus
-	focusBeforeHelp      focus   // Stores focus before opening help overlay
-	treeViewActive       bool    // True when tree view is the active left pane (bd-xfd)
-	treeDetailHidden     bool    // True when detail panel is hidden in tree view (bd-80u)
-	detailHiddenByNarrow bool    // True when detail was auto-hidden due to narrow window (bd-6eg)
+	focusBeforeHelp      focus // Stores focus before opening help overlay
+	treeViewActive       bool  // True when tree view is the active left pane (bd-xfd)
+	treeDetailHidden     bool  // True when detail panel is hidden in tree view (bd-80u)
+	detailHiddenByNarrow bool  // True when detail was auto-hidden due to narrow window (bd-6eg)
 	isSplitView          bool
 	splitPaneRatio       float64 // Ratio of list pane width (0.2-0.8), default 0.4
 	isBoardView          bool
@@ -387,26 +388,26 @@ type Model struct {
 	showHelp             bool
 	helpScroll           int // Scroll offset for help overlay
 	showQuitConfirm      bool
-	showDeleteConfirm    bool   // True when delete confirmation dialog is visible
-	deleteTargetID       string // Issue ID pending deletion
-	deleteTargetTitle    string // Issue title for confirmation display
+	showDeleteConfirm    bool           // True when delete confirmation dialog is visible
+	deleteTargetID       string         // Issue ID pending deletion
+	deleteTargetTitle    string         // Issue title for confirmation display
 	showDBHealth         bool           // True when database health popup is visible
 	dbHealth             DatabaseHealth // Cached result of the last health check
 	ready                bool
 	width                int
 	height               int
-	pickerVisible    bool // bd-2me: H toggles picker panel (bd-j764)
-	pickerMode       int  // 0 = projects, 1 = labels, 2 = assignees (bd-gj41, bd-gs45.1)
-	labelEntries     []LabelEntry // labels with counts and number assignments
-	labelScrollOffset int // scroll offset for label bar when >9 labels (bd-np1d)
-	assigneeEntries     []AssigneeEntry // assignees with counts and number assignments (bd-gs45.1)
-	assigneeScrollOffset int // scroll offset for assignee bar when >9 assignees (bd-gs45.1)
+	pickerVisible        bool            // bd-2me: H toggles picker panel (bd-j764)
+	pickerMode           int             // 0 = projects, 1 = labels, 2 = assignees (bd-gj41, bd-gs45.1)
+	labelEntries         []LabelEntry    // labels with counts and number assignments
+	labelScrollOffset    int             // scroll offset for label bar when >9 labels (bd-np1d)
+	assigneeEntries      []AssigneeEntry // assignees with counts and number assignments (bd-gs45.1)
+	assigneeScrollOffset int             // scroll offset for assignee bar when >9 assignees (bd-gs45.1)
 
 	// Filter and sort state
-	currentFilter  string // status filter: "all", "open", "closed", "ready"
-	labelFilter    string // label filter: "" = none, "bug" = filter to label "bug" (bd-dlqi)
-	assigneeFilter string // assignee filter: "" = none (bd-gs45.1)
-	sortMode      SortMode // bv-3ita: current sort mode
+	currentFilter  string   // status filter: "all", "open", "closed", "ready"
+	labelFilter    string   // label filter: "" = none, "bug" = filter to label "bug" (bd-dlqi)
+	assigneeFilter string   // assignee filter: "" = none (bd-gs45.1)
+	sortMode       SortMode // bv-3ita: current sort mode
 
 	// Stats (cached)
 	countOpen    int
@@ -466,17 +467,17 @@ type Model struct {
 	editModal     EditModal
 
 	// Project switching (bd-q5z, bd-ey3)
-	activeProjectName string            // Name of the currently loaded project
-	activeProjectPath string            // Path to the project directory
-	activeProjectFavN int               // Favorite number (1-9, or 0)
-	appConfig         config.Config     // Loaded app configuration
-	allProjects       []config.Project  // All known projects
+	activeProjectName string           // Name of the currently loaded project
+	activeProjectPath string           // Path to the project directory
+	activeProjectFavN int              // Favorite number (1-9, or 0)
+	appConfig         config.Config    // Loaded app configuration
+	allProjects       []config.Project // All known projects
 	projectPicker     ProjectPickerModel
 
 	// All-projects mode (bd-g68w): read-only cross-project view
-	allProjectsMode    bool
-	multiDoltReader    *datasource.MultiDoltReader
-	multiDoltWatcher   *datasource.MultiDoltWatcher
+	allProjectsMode  bool
+	multiDoltReader  *datasource.MultiDoltReader
+	multiDoltWatcher *datasource.MultiDoltWatcher
 }
 
 // labelCount is a simple label->count pair for display
@@ -898,8 +899,8 @@ func NewModel(issues []model.Issue, beadsPath string) Model {
 		list:                l,
 		viewport:            vp,
 		renderer:            renderer,
-		board: board,
-		tree:  treeModel,
+		board:               board,
+		tree:                treeModel,
 		theme:               theme,
 		currentFilter:       "all",
 		focused:             focusTree, // Tree view is the default on launch (bd-dxc)
@@ -907,17 +908,18 @@ func NewModel(issues []model.Issue, beadsPath string) Model {
 		treeDetailHidden:    true,      // Start tree-only; user presses 'd' to show detail (bd-x96a)
 		splitPaneRatio:      0.4,       // Default: list pane gets 40% of width
 		// Initialize as ready with default dimensions to eliminate "Initializing..." phase
-		ready:         true,
-		width:         defaultWidth,
-		height:        defaultHeight,
-		countOpen:     cOpen,
-		countReady:    cReady,
-		countBlocked:  cBlocked,
-		countClosed:   cClosed,
-		labelPicker:   labelPicker,
-		statusMsg:     initialStatus,
-		statusIsError: initialStatusErr,
-		pickerVisible: true, // bd-2me: visible by default, H toggles (bd-j764)
+		ready:            true,
+		width:            defaultWidth,
+		height:           defaultHeight,
+		countOpen:        cOpen,
+		countReady:       cReady,
+		countBlocked:     cBlocked,
+		countClosed:      cClosed,
+		labelPicker:      labelPicker,
+		statusMsg:        initialStatus,
+		statusIsError:    initialStatusErr,
+		doltPollInterval: config.DefaultRefreshPollInterval,
+		pickerVisible:    true, // bd-2me: visible by default, H toggles (bd-j764)
 		// Tutorial integration (bv-8y31)
 		tutorialModel: NewTutorialModel(theme),
 		// Issue writer for in-app editing (bd-a83)
@@ -929,6 +931,7 @@ func NewModel(issues []model.Issue, beadsPath string) Model {
 // Call this after NewModel to enable project switching and favorites.
 func (m Model) WithConfig(cfg config.Config, projectName, projectPath string) Model {
 	m.appConfig = cfg
+	m.doltPollInterval = cfg.RefreshPollInterval()
 	m.activeProjectName = projectName
 	m.activeProjectPath = projectPath
 	m.activeProjectFavN = cfg.ProjectFavoriteNumber(projectName)
@@ -1486,7 +1489,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						db = "beads"
 					}
 					doltLabel := fmt.Sprintf("dolt://%s/%s", s.Path, db)
-					dw, dwErr := datasource.NewDoltWatcher(s, 500*time.Millisecond)
+					dw, dwErr := datasource.NewDoltWatcher(s, m.doltPollInterval)
 					if dwErr != nil {
 						m.doltFailure = &DoltFailure{Server: s.Path, Database: db, User: s.User, Error: dwErr.Error()}
 					} else if err := dw.Start(); err != nil {
@@ -2020,7 +2023,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Force refresh (bv-4auz): Ctrl+R / F5 triggers an immediate reload.
+		// Ctrl+R and F5 trigger an immediate reload.
 		if (msg.String() == "ctrl+r" || msg.String() == "f5") && m.list.FilterState() != list.Filtering {
 			now := time.Now()
 			if !m.lastForceRefresh.IsZero() && now.Sub(m.lastForceRefresh) < time.Second {
@@ -3066,7 +3069,6 @@ func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
 	}
 	return m
 }
-
 
 // handleRepoPickerKeys handles keyboard input when repo picker is focused (workspace mode).
 func (m Model) handleRepoPickerKeys(msg tea.KeyMsg) Model {
@@ -4248,6 +4250,7 @@ func (m *Model) renderFooter() string {
 	case "tree":
 		hints = []hint{
 			{"0-9", "project"},
+			{"^R", "refresh"},
 			{"tab", "fold"},
 			{"⇧tab", "fold all"},
 			{"enter", "detail"},
@@ -4261,6 +4264,7 @@ func (m *Model) renderFooter() string {
 	case "board":
 		hints = []hint{
 			{"0-9", "project"},
+			{"^R", "refresh"},
 			{"tab", "fold"},
 			{"⇧tab", "fold all"},
 			{"enter", "detail"},
@@ -4273,6 +4277,7 @@ func (m *Model) renderFooter() string {
 	case "split":
 		hints = []hint{
 			{"0-9", "project"},
+			{"^R", "refresh"},
 			{"tab", "fold"},
 			{"</>", "resize"},
 			{"t", "tree"},
@@ -4284,6 +4289,7 @@ func (m *Model) renderFooter() string {
 	case "detail":
 		hints = []hint{
 			{"0-9", "project"},
+			{"^R", "refresh"},
 			{"esc", "back"},
 			{"e", "edit"},
 			{"C", "copy"},
@@ -4294,6 +4300,7 @@ func (m *Model) renderFooter() string {
 	default: // list view
 		hints = []hint{
 			{"0-9", "project"},
+			{"^R", "refresh"},
 			{"t", "tree"},
 			{"b", "board"},
 			{"s", "split"},
@@ -4893,7 +4900,6 @@ func (m *Model) collectEditSuggestions() EditSuggestions {
 func (m Model) IsBoardView() bool {
 	return m.isBoardView
 }
-
 
 // TreeSelectedID returns the ID of the currently selected tree node, or "".
 func (m Model) TreeSelectedID() string {
@@ -5614,7 +5620,7 @@ func (m *Model) enterAllProjectsMode() tea.Cmd {
 	m.tree.ClearSearch()
 
 	// Start multi watcher
-	watcher := datasource.NewMultiDoltWatcher(reader, 500*time.Millisecond)
+	watcher := datasource.NewMultiDoltWatcher(reader, m.doltPollInterval)
 	if err := watcher.Start(); err != nil {
 		debug.Log("all-projects: watcher start failed: %v", err)
 	}
@@ -5666,7 +5672,7 @@ func (m *Model) exitAllProjectsMode() {
 				if db == "" {
 					db = "beads"
 				}
-				dw, dwErr := datasource.NewDoltWatcher(s, 500*time.Millisecond)
+				dw, dwErr := datasource.NewDoltWatcher(s, m.doltPollInterval)
 				if dwErr == nil {
 					if err := dw.Start(); err == nil {
 						m.doltWatcher = dw
@@ -5935,7 +5941,7 @@ func (m Model) renderLabelBar() string {
 			scrollParts = append(scrollParts, fmt.Sprintf("↓%d", remaining))
 		}
 		if len(scrollParts) > 0 {
-			lines[0] += dimStyle.Render("  "+strings.Join(scrollParts, " "))
+			lines[0] += dimStyle.Render("  " + strings.Join(scrollParts, " "))
 		}
 	}
 

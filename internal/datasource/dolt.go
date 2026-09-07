@@ -479,6 +479,17 @@ func (r *DoltReader) GetHeadHash() (string, error) {
 	return hash, nil
 }
 
+// GetDatabaseHash returns a hash of the current branch's working database
+// contents. Unlike HEAD, this changes for writes that have not been committed.
+func (r *DoltReader) GetDatabaseHash() (string, error) {
+	var hash string
+	if err := r.db.QueryRow("SELECT DOLT_HASHOF_DB()").Scan(&hash); err != nil {
+		debug.Log("dolt: DOLT_HASHOF_DB() failed: %v", err)
+		return "", fmt.Errorf("failed to get database hash: %w", err)
+	}
+	return hash, nil
+}
+
 // GetLastModified returns the most recent updated_at timestamp across all issues.
 func (r *DoltReader) GetLastModified() (time.Time, error) {
 	var updatedAt sql.NullTime

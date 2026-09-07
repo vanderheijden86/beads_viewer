@@ -8,8 +8,8 @@ import (
 	"github.com/vanderheijden86/beadwork/pkg/debug"
 )
 
-// MultiDoltWatcher polls HEAD hashes across multiple Dolt databases and fires
-// a change notification when any database has a new commit.
+// MultiDoltWatcher polls working-set content hashes across multiple Dolt
+// databases and fires a change notification when any database changes.
 type MultiDoltWatcher struct {
 	reader       *MultiDoltReader
 	pollInterval time.Duration
@@ -45,7 +45,7 @@ func (w *MultiDoltWatcher) Start() error {
 	}
 
 	// Capture initial hashes
-	w.lastHashes = w.reader.GetHeadHashes()
+	w.lastHashes = w.reader.GetDatabaseHashes()
 	debug.Log("multi-dolt-watcher: initial hashes for %d databases", len(w.lastHashes))
 
 	w.started = true
@@ -77,7 +77,7 @@ func (w *MultiDoltWatcher) poll() {
 		case <-w.ctx.Done():
 			return
 		case <-ticker.C:
-			hashes := w.reader.GetHeadHashes()
+			hashes := w.reader.GetDatabaseHashes()
 			changed := false
 			for db, hash := range hashes {
 				if old, ok := w.lastHashes[db]; !ok || old != hash {
