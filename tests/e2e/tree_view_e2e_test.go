@@ -123,14 +123,14 @@ func runTreeTUI(t *testing.T, dir string, autoCloseMs int, keys []keyStep) ([]by
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	cmd := scriptTUICommand(ctx, bv)
+	cmd := sizedScriptTUICommand(ctx, bv)
 	if cmd == nil {
 		t.Skip("skipping: script command not available on this platform")
 		return nil, nil
 	}
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
-		"TERM=xterm-256color",
+		"TERM=screen-256color",
 		fmt.Sprintf("B9S_TUI_AUTOCLOSE_MS=%d", autoCloseMs),
 	)
 
@@ -227,7 +227,7 @@ func truncateOutput(s string, maxLen int) string {
 // ============================================================================
 
 // TestTreeViewEnterAndExit verifies that pressing E enters the tree view and
-// the output contains tree structure elements (branch chars, issue IDs).
+// the output contains tree structure elements and issue titles.
 func TestTreeViewEnterAndExit(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTreeFixture(t, tempDir, makeTreeHierarchy(t))
@@ -239,8 +239,8 @@ func TestTreeViewEnterAndExit(t *testing.T) {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
 	}
 
-	// Tree view should show issue IDs from the hierarchy
-	containsAll(t, out, []string{"epic-1", "task-1"})
+	// Tree view should show issues from the hierarchy.
+	containsAll(t, out, []string{"Epic One", "Task One"})
 }
 
 func TestTreeViewCreatedSortNumberedChildren(t *testing.T) {
@@ -259,9 +259,7 @@ func TestTreeViewCreatedSortNumberedChildren(t *testing.T) {
 	writeTreeFixture(t, dir, issues)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	// The captured terminal needs dimensions for Bubble Tea to render a frame.
-	binary := "'" + strings.ReplaceAll(buildBvBinary(t), "'", "'\\''") + "'"
-	cmd := scriptTUICommand(ctx, "/bin/sh", "-c", "stty rows 40 cols 160; exec "+binary)
+	cmd := sizedScriptTUICommand(ctx, buildBvBinary(t))
 	if cmd == nil {
 		t.Fatal("script PTY is required for the sorting regression")
 	}
@@ -304,7 +302,7 @@ func TestTreeViewShowsHierarchy(t *testing.T) {
 	}
 
 	// Root epics and their immediate children should be visible (depth < 2 = auto-expanded)
-	containsAll(t, out, []string{"epic-1", "epic-2", "task-1", "task-2", "task-3"})
+	containsAll(t, out, []string{"Epic One", "Epic Two", "Task One", "Task Two", "Task Three"})
 }
 
 // ============================================================================
@@ -326,7 +324,7 @@ func TestTreeViewExpandAll(t *testing.T) {
 	}
 
 	// After expand all, subtasks should be visible
-	containsAll(t, out, []string{"subtask-1", "subtask-2", "standalone-1"})
+	containsAll(t, out, []string{"Subtask Alpha", "Subtask Beta", "Standalone Task"})
 }
 
 // TestTreeViewCollapseAll verifies that pressing Z collapses all nodes.
@@ -344,7 +342,7 @@ func TestTreeViewCollapseAll(t *testing.T) {
 	}
 
 	// Root items should still be visible
-	containsAll(t, out, []string{"epic-1", "epic-2", "standalone-1"})
+	containsAll(t, out, []string{"Epic One", "Epic Two", "Standalone Task"})
 
 	// Child tasks should not be visible after collapse (they are children of collapsed nodes)
 	// Note: Due to terminal output buffering, earlier frames may still contain these.
@@ -353,7 +351,7 @@ func TestTreeViewCollapseAll(t *testing.T) {
 	lastHeaderIdx := strings.LastIndex(s, "TYPE PRI STATUS")
 	if lastHeaderIdx >= 0 {
 		finalFrame := s[lastHeaderIdx:]
-		if strings.Contains(finalFrame, "task-1") || strings.Contains(finalFrame, "task-2") {
+		if strings.Contains(finalFrame, "Task One") || strings.Contains(finalFrame, "Task Two") {
 			// Children of collapsed epics should not appear in the final frame
 			// This is a soft check because terminal output may interleave frames
 			t.Log("Note: child tasks still visible in final frame after collapse-all (may be terminal buffering)")
@@ -377,7 +375,7 @@ func TestTreeViewToggleExpand(t *testing.T) {
 	}
 
 	// After expanding epic-1, its children should become visible
-	containsAll(t, out, []string{"epic-1", "task-1", "task-2"})
+	containsAll(t, out, []string{"Epic One", "Task One", "Task Two"})
 }
 
 // ============================================================================
@@ -400,7 +398,7 @@ func TestTreeViewNavigation(t *testing.T) {
 	}
 
 	// The tree should be rendered with issue content visible
-	containsAll(t, out, []string{"epic-1", "task-1"})
+	containsAll(t, out, []string{"Epic One", "Task One"})
 }
 
 // TestTreeViewJumpTopBottom verifies g/G jump to top/bottom of the tree.
@@ -419,7 +417,7 @@ func TestTreeViewJumpTopBottom(t *testing.T) {
 	}
 
 	// Should show the full tree
-	containsAll(t, out, []string{"epic-1", "standalone-1"})
+	containsAll(t, out, []string{"Epic One", "Standalone Task"})
 }
 
 // TestTreeViewCollapseOrJumpToParent verifies h key collapses expanded nodes
@@ -441,7 +439,7 @@ func TestTreeViewCollapseOrJumpToParent(t *testing.T) {
 	}
 
 	// Tree should still show the overall structure
-	containsAll(t, out, []string{"epic-1", "task-1"})
+	containsAll(t, out, []string{"Epic One", "Task One"})
 }
 
 // TestTreeViewExpandOrMoveToChild verifies l key expands collapsed nodes
@@ -461,7 +459,7 @@ func TestTreeViewExpandOrMoveToChild(t *testing.T) {
 	}
 
 	// epic-1's children should now be visible
-	containsAll(t, out, []string{"task-1", "task-2"})
+	containsAll(t, out, []string{"Task One", "Task Two"})
 }
 
 // ============================================================================
@@ -483,7 +481,7 @@ func TestTreeViewFilterOpen(t *testing.T) {
 	}
 
 	// Open issues should be visible
-	containsAll(t, out, []string{"task-f1", "task-f5"})
+	containsAll(t, out, []string{"Open Task A", "Ready Task E"})
 }
 
 // TestTreeViewFilterClosed verifies pressing 'c' filters to show only closed issues.
@@ -501,7 +499,7 @@ func TestTreeViewFilterClosed(t *testing.T) {
 	}
 
 	// Closed issues should be visible
-	containsAll(t, out, []string{"task-f2", "task-f4"})
+	containsAll(t, out, []string{"Closed Task B", "Closed Task D"})
 }
 
 // TestTreeViewFilterReady verifies pressing 'r' filters to show only ready (unblocked) issues.
@@ -519,7 +517,7 @@ func TestTreeViewFilterReady(t *testing.T) {
 	}
 
 	// Ready (open + unblocked) issues should be visible
-	containsAll(t, out, []string{"task-f5"})
+	containsAll(t, out, []string{"Ready Task E"})
 }
 
 // TestTreeViewFilterAllResets verifies pressing 'a' resets the filter to show all issues.
@@ -538,7 +536,7 @@ func TestTreeViewFilterAllResets(t *testing.T) {
 	}
 
 	// After resetting filter, all issues should be visible
-	containsAll(t, out, []string{"epic-f1", "task-f1", "task-f5"})
+	containsAll(t, out, []string{"Open Epic", "Open Task A", "Ready Task E"})
 }
 
 // TestTreeViewFilterEscClears verifies that ESC clears an active filter before exiting tree view.
@@ -556,7 +554,7 @@ func TestTreeViewFilterEscClears(t *testing.T) {
 	}
 
 	// After ESC clearing filter, open issues should be visible again
-	containsAll(t, out, []string{"epic-f1", "task-f5"})
+	containsAll(t, out, []string{"Open Epic", "Ready Task E"})
 }
 
 // ============================================================================
@@ -614,8 +612,8 @@ func TestTreeViewSearchByID(t *testing.T) {
 		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
 	}
 
-	// Should find epic-2 by ID search
-	containsAll(t, out, []string{"epic-2"})
+	// Should find Epic Two by its epic-2 ID search.
+	containsAll(t, out, []string{"Epic Two"})
 }
 
 // ============================================================================
@@ -637,7 +635,7 @@ func TestTreeViewSortCycle(t *testing.T) {
 	}
 
 	// Tree should still render with all root issues visible (order may change)
-	containsAll(t, out, []string{"epic-1", "epic-2"})
+	containsAll(t, out, []string{"Epic One", "Epic Two"})
 }
 
 // ============================================================================
@@ -723,7 +721,7 @@ func TestTreeViewNoHierarchy(t *testing.T) {
 	}
 
 	// All issues should be shown as root nodes (no nesting)
-	containsAll(t, out, []string{"t-1", "t-2", "t-3"})
+	containsAll(t, out, []string{"Task A", "Task B", "Task C"})
 
 	// Should NOT have tree branch characters since all are roots
 	s := string(out)
@@ -770,7 +768,7 @@ func TestTreeViewDeepNesting(t *testing.T) {
 	}
 
 	// All levels should be visible after expand all
-	containsAll(t, out, []string{"d-0", "d-1", "d-2", "d-3", "d-4", "d-5"})
+	containsAll(t, out, []string{"Root", "Level 1", "Level 2", "Level 3", "Level 4", "Level 5"})
 }
 
 // ============================================================================
@@ -804,7 +802,7 @@ func TestTreeViewArrowDownNavigation(t *testing.T) {
 	}
 
 	// Tree should render with issues visible (arrows didn't break anything)
-	containsAll(t, out, []string{"epic-1", "task-1"})
+	containsAll(t, out, []string{"Epic One", "Task One"})
 }
 
 // TestTreeViewArrowDownMatchesJKey verifies that arrow Down produces the same
@@ -834,8 +832,8 @@ func TestTreeViewArrowDownMatchesJKey(t *testing.T) {
 	}
 
 	// Both runs should show the tree structure
-	containsAll(t, out1, []string{"epic-1", "task-1"})
-	containsAll(t, out2, []string{"epic-1", "task-1"})
+	containsAll(t, out1, []string{"Epic One", "Task One"})
+	containsAll(t, out2, []string{"Epic One", "Task One"})
 }
 
 // TestTreeViewArrowLeftCollapsesNode verifies that Left arrow collapses an
@@ -853,7 +851,7 @@ func TestTreeViewArrowLeftCollapsesNode(t *testing.T) {
 	}
 
 	// epic-1 should still be visible (it's just collapsed, not hidden)
-	containsAll(t, out, []string{"epic-1"})
+	containsAll(t, out, []string{"Epic One"})
 }
 
 // TestTreeViewArrowRightExpandsNode verifies that Right arrow expands a
@@ -872,7 +870,7 @@ func TestTreeViewArrowRightExpandsNode(t *testing.T) {
 	}
 
 	// After expanding epic-1, its children should be visible
-	containsAll(t, out, []string{"epic-1", "task-1"})
+	containsAll(t, out, []string{"Epic One", "Task One"})
 }
 
 // TestTreeViewArrowKeysOnlyNavigation verifies that a tree view session using
@@ -898,7 +896,7 @@ func TestTreeViewArrowKeysOnlyNavigation(t *testing.T) {
 	}
 
 	// Should show the full hierarchy was navigated
-	containsAll(t, out, []string{"epic-1", "task-1", "task-2"})
+	containsAll(t, out, []string{"Epic One", "Task One", "Task Two"})
 }
 
 // TestTreeViewArrowKeysWithManyNodes verifies arrow key pagination works with
@@ -935,5 +933,5 @@ func TestTreeViewArrowKeysWithManyNodes(t *testing.T) {
 
 	// After scrolling down 15 times, later tasks should be visible
 	// The viewport should have scrolled to show tasks beyond the initial view
-	containsAll(t, out, []string{"t-14", "t-15"})
+	containsAll(t, out, []string{"Task 14", "Task 15"})
 }
