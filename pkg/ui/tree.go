@@ -635,16 +635,63 @@ func (t *TreeModel) GetSortDirection() SortDirection {
 // sortAllSiblings walks the entire tree and sorts children at each level (bd-adf).
 func (t *TreeModel) sortAllSiblings() {
 	t.sortNodesByFieldDirection(t.roots)
-	var walk func(nodes []*IssueTreeNode)
-	walk = func(nodes []*IssueTreeNode) {
+	var walk func(nodes []*IssueTreeNode, inEpic bool)
+	walk = func(nodes []*IssueTreeNode, inEpic bool) {
 		for _, node := range nodes {
+			withinEpic := inEpic || (node.Issue != nil && node.Issue.IssueType == model.TypeEpic)
 			if len(node.Children) > 1 {
-				t.sortNodesByFieldDirection(node.Children)
+				if t.sortField == SortFieldCreated && withinEpic {
+					sort.Slice(node.Children, func(i, j int) bool {
+						a, b := node.Children[i].Issue, node.Children[j].Issue
+						if a == nil || b == nil {
+							return a != nil
+						}
+						if cmp := compareNaturalTitle(a.Title, b.Title); cmp != 0 {
+							return cmp < 0
+						}
+						return a.ID < b.ID
+					})
+				} else {
+					t.sortNodesByFieldDirection(node.Children)
+				}
 			}
-			walk(node.Children)
+			walk(node.Children, withinEpic)
 		}
 	}
-	walk(t.roots)
+	walk(t.roots, false)
+}
+
+// compareNaturalTitle compares digit runs by magnitude without integer overflow.
+func compareNaturalTitle(a, b string) int {
+	a, b = strings.ToLower(a), strings.ToLower(b)
+	for len(a) > 0 && len(b) > 0 {
+		if a[0] >= '0' && a[0] <= '9' && b[0] >= '0' && b[0] <= '9' {
+			i, j := 0, 0
+			for i < len(a) && a[i] >= '0' && a[i] <= '9' {
+				i++
+			}
+			for j < len(b) && b[j] >= '0' && b[j] <= '9' {
+				j++
+			}
+			x, y := strings.TrimLeft(a[:i], "0"), strings.TrimLeft(b[:j], "0")
+			if len(x) < len(y) {
+				return -1
+			}
+			if len(x) > len(y) {
+				return 1
+			}
+			if cmp := strings.Compare(x, y); cmp != 0 {
+				return cmp
+			}
+			a, b = a[i:], b[j:]
+			continue
+		}
+		if a[0] != b[0] {
+			return strings.Compare(a[:1], b[:1])
+		}
+		a, b = a[1:], b[1:]
+	}
+	return strings.Compare(a, b)
 }
 
 // sortNodesByFieldDirection sorts a slice of sibling nodes using the current
@@ -914,6 +961,7 @@ func (t *TreeModel) ApplyFilter(filter string) {
 	if t.currentFilter == "all" && t.labelFilter == "" && t.assigneeFilter == "" {
 		t.filterMatches = nil
 		t.contextAncestors = nil
+		t.refreshSearchMatches() // matches are scoped to the filter (bd-oe1y)
 		t.rebuildFlatList()
 		return
 	}
@@ -944,6 +992,10 @@ func (t *TreeModel) ApplyFilter(filter string) {
 			node.Expanded = true
 		}
 	}
+
+	// An active search is scoped to the filter, so its matches go stale as soon
+	// as the filter changes (bd-oe1y).
+	t.refreshSearchMatches()
 
 	t.rebuildFlatList()
 }
@@ -2155,6 +2207,11 @@ func (t *TreeModel) rebuildFlatList() {
 	}
 	if t.filterMatches != nil && (t.labelFilter != "" || t.assigneeFilter != "" || (t.currentFilter != "" && t.currentFilter != "all")) {
 		t.rebuildFilteredFlatList()
+		// Occur narrows the filtered set further; it must not be dropped just
+		// because a label/assignee/status filter is also active (bd-oe1y).
+		if t.occurMode && t.occurPattern != "" {
+			t.rebuildOccurFlatList()
+		}
 		return
 	}
 	// Occur mode: filter to matching issues (bd-sjs.2)
@@ -2448,11 +2505,40 @@ func isAdvancedQuery(q string) bool {
 	return strings.Contains(q, ":") || strings.HasPrefix(q, "!")
 }
 
-// executeSearch walks ALL nodes (including collapsed ones) and builds the match list.
-// Auto-expands ancestors of the first match and navigates to it.
+// isSearchable reports whether a node may be reported as a search match under
+// the currently active status/label/assignee filter. Search composes with (ANDs)
+// the filter so filtering is never silently dropped, and so every reported match
+// is reachable with n/N (bd-oe1y).
+func (t *TreeModel) isSearchable(node *IssueTreeNode) bool {
+	if node == nil || node.Issue == nil {
+		return false
+	}
+	if t.filterMatches == nil {
+		return true // no filter active: everything is in scope
+	}
+	return t.filterMatches[node.Issue.ID]
+}
+
+// executeSearch recomputes the match list and navigates to the first match,
+// auto-expanding its ancestors.
+func (t *TreeModel) executeSearch() {
+	t.refreshSearchMatches()
+
+	// Auto-expand and navigate to first match
+	if len(t.searchMatches) > 0 {
+		t.expandPathToNode(t.searchMatches[0])
+		t.rebuildFlatList()
+		t.SelectByID(t.searchMatches[0].Issue.ID)
+		t.ensureCursorVisible()
+	}
+}
+
+// refreshSearchMatches walks ALL nodes in scope (including collapsed ones) and
+// rebuilds the match list without moving the cursor. Scope is the XRay subtree
+// when drilled down, and is always restricted to the active filter (bd-oe1y).
 // If the query contains advanced filter syntax (field:value, !negation), uses
 // structured predicate matching instead of plain text (bd-08h).
-func (t *TreeModel) executeSearch() {
+func (t *TreeModel) refreshSearchMatches() {
 	t.searchMatches = nil
 	t.searchMatchIDs = make(map[string]bool)
 	t.searchMatchIndex = 0
@@ -2484,7 +2570,7 @@ func (t *TreeModel) executeSearch() {
 				strings.Contains(strings.ToLower(node.Issue.ID), query)
 		}
 
-		if matches {
+		if matches && t.isSearchable(node) {
 			t.searchMatches = append(t.searchMatches, node)
 			t.searchMatchIDs[node.Issue.ID] = true
 		}
@@ -2492,16 +2578,13 @@ func (t *TreeModel) executeSearch() {
 			walk(child)
 		}
 	}
-	for _, root := range t.roots {
-		walk(root)
-	}
-
-	// Auto-expand and navigate to first match
-	if len(t.searchMatches) > 0 {
-		t.expandPathToNode(t.searchMatches[0])
-		t.rebuildFlatList()
-		t.SelectByID(t.searchMatches[0].Issue.ID)
-		t.ensureCursorVisible()
+	if t.xrayRoot != nil {
+		// XRay mode: search is scoped to the drilled-down subtree (bd-0rc)
+		walk(t.xrayRoot)
+	} else {
+		for _, root := range t.roots {
+			walk(root)
+		}
 	}
 }
 

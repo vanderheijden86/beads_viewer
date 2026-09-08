@@ -12,9 +12,9 @@ import (
 // MultiDoltReader loads issues from multiple Dolt databases on the same server.
 // Each database gets its own DoltReader (separate connection).
 type MultiDoltReader struct {
-	readers  map[string]*DoltReader // database name -> reader
-	dbNames  []string              // ordered list of database names
-	mu       sync.RWMutex
+	readers map[string]*DoltReader // database name -> reader
+	dbNames []string               // ordered list of database names
+	mu      sync.RWMutex
 }
 
 // DoltDBInfo holds connection info for one Dolt database, extracted from a project.
@@ -126,14 +126,14 @@ func (m *MultiDoltReader) LoadAllIssues() ([]model.Issue, error) {
 	return all, nil
 }
 
-// GetHeadHashes returns the HEAD hash for each database.
-func (m *MultiDoltReader) GetHeadHashes() map[string]string {
+// GetDatabaseHashes returns the working-set content hash for each database.
+func (m *MultiDoltReader) GetDatabaseHashes() map[string]string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	hashes := make(map[string]string, len(m.readers))
 	for db, reader := range m.readers {
-		hash, err := reader.GetHeadHash()
+		hash, err := reader.GetDatabaseHash()
 		if err != nil {
 			continue
 		}

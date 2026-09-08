@@ -67,17 +67,18 @@ func detectScriptTUICapability(bvPath string) (bool, string) {
 		return false, fmt.Sprintf("failed to write beads.jsonl: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cmd := scriptTUICommand(ctx, bvPath)
+	cmd := sizedScriptTUICommand(ctx, bvPath)
 	if cmd == nil {
 		return false, "script command unavailable"
 	}
 	cmd.Dir = tempDir
+	cmd.Stdin = strings.NewReader("")
 	cmd.Env = append(os.Environ(),
-		"TERM=xterm-256color",
-		"B9S_TUI_AUTOCLOSE_MS=250",
+		"TERM=screen-256color",
+		"B9S_TUI_AUTOCLOSE_MS=500",
 	)
 
 	outFile := filepath.Join(tempDir, "script.out")
@@ -172,6 +173,28 @@ func scriptTUICommand(ctx context.Context, bvPath string, args ...string) *exec.
 
 	default:
 		return nil
+	}
+}
+
+// sizedScriptTUICommand gives captured PTYs the same usable viewport on every
+// platform. Linux CI otherwise inherits a tiny terminal and paginates fixtures
+// one row at a time.
+func sizedScriptTUICommand(ctx context.Context, bvPath string) *exec.Cmd {
+	quotedBinary := "'" + strings.ReplaceAll(bvPath, "'", "'\\''") + "'"
+	return scriptTUICommand(ctx, "/bin/sh", "-c", "stty rows 40 cols 160; exec "+quotedBinary)
+}
+
+func TestSizedScriptTUICommandSetsDeterministicDimensions(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	cmd := sizedScriptTUICommand(ctx, "/tmp/bv")
+	if cmd == nil {
+		t.Skip("script command not available")
+	}
+	invocation := strings.Join(cmd.Args, " ")
+	if !strings.Contains(invocation, "stty rows 40 cols 160") {
+		t.Fatalf("expected deterministic PTY dimensions, got %q", invocation)
 	}
 }
 

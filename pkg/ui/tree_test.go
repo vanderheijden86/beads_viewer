@@ -177,7 +177,7 @@ func TestTreeBuildCycleDetection(t *testing.T) {
 	// This is correct behavior - a pure cycle has no entry point
 }
 
-// TestTreeBuildChildSorting verifies children are sorted by priority, type, date
+// TestTreeBuildChildSorting verifies epic children are sorted by title.
 func TestTreeBuildChildSorting(t *testing.T) {
 	now := time.Now()
 	issues := []model.Issue{
@@ -208,8 +208,7 @@ func TestTreeBuildChildSorting(t *testing.T) {
 		t.Fatalf("expected 3 children, got %d", len(children))
 	}
 
-	// Expected order: P1 Task (priority 1, task before bug), P1 Bug, P2 Task
-	expectedOrder := []string{"child-p1-task", "child-p1-bug", "child-p2-task"}
+	expectedOrder := []string{"child-p1-bug", "child-p1-task", "child-p2-task"}
 	for i, expected := range expectedOrder {
 		if children[i].Issue.ID != expected {
 			t.Errorf("child[%d]: expected %s, got %s", i, expected, children[i].Issue.ID)
@@ -3991,7 +3990,7 @@ func TestTreeDefaultSortCreatedDesc(t *testing.T) {
 
 // TestTreeDefaultSortCreatedDescWithHierarchy verifies that the default sort
 // (Created/Descending) works correctly with parent-child hierarchies (bd-2ty).
-// Both root nodes and sibling children should be sorted newest-first.
+// Roots use creation dates; epic children use ascending titles.
 func TestTreeDefaultSortCreatedDescWithHierarchy(t *testing.T) {
 	now := time.Now()
 
@@ -4039,7 +4038,7 @@ func TestTreeDefaultSortCreatedDescWithHierarchy(t *testing.T) {
 
 	// Collect display order. With created desc:
 	// Root order: epic-new (newer) before epic-old (older)
-	// Under epic-old: child-new (newer) before child-old (older)
+	// Under epic-old: child-new (New Child) before child-old (Old Child)
 	// Total flat list with default expand (epics expanded):
 	//   epic-new, epic-old, child-new, child-old
 	var displayOrder []string
@@ -4063,7 +4062,7 @@ func TestTreeDefaultSortCreatedDescWithHierarchy(t *testing.T) {
 		t.Errorf("expected epic-new before epic-old in root order, got %v (full: %v)", rootOrder, displayOrder)
 	}
 
-	// Verify child ordering under epic-old: newest child first
+	// Verify alphabetical child ordering under epic-old.
 	childOrder := []string{}
 	for _, id := range displayOrder {
 		if id == "child-new" || id == "child-old" {
@@ -4072,6 +4071,80 @@ func TestTreeDefaultSortCreatedDescWithHierarchy(t *testing.T) {
 	}
 	if len(childOrder) < 2 || childOrder[0] != "child-new" {
 		t.Errorf("expected child-new before child-old in child order, got %v (full: %v)", childOrder, displayOrder)
+	}
+}
+
+func TestCompareNaturalTitle(t *testing.T) {
+	for _, pair := range [][2]string{
+		{"[epic.2] Z", "[epic.10] A"},
+		{"Phase 2", "Phase 10"},
+		{"alpha", "Beta"},
+		{"[epic.1.2] Step", "[epic.1.10] Step"},
+		{"Step 99999999999999999999", "Step 100000000000000000000"},
+		{"Step 02 A", "Step 2 B"},
+		{"", "A"},
+	} {
+		if compareNaturalTitle(pair[0], pair[1]) >= 0 || compareNaturalTitle(pair[1], pair[0]) <= 0 {
+			t.Errorf("expected natural ordering %q before %q", pair[0], pair[1])
+		}
+	}
+	if compareNaturalTitle("Step 02", "step 2") != 0 {
+		t.Error("case and leading zeroes should compare equally")
+	}
+}
+
+func TestTreeCreatedSortEpicChildrenNaturalTitle(t *testing.T) {
+	for _, dir := range []SortDirection{SortAscending, SortDescending} {
+		t.Run(fmt.Sprint(dir), func(t *testing.T) {
+			now := time.Now()
+			issues := []model.Issue{
+				{ID: "epic", Title: "Z Epic", IssueType: model.TypeEpic, CreatedAt: now},
+				{ID: "older", Title: "A Epic", IssueType: model.TypeEpic, CreatedAt: now.Add(-time.Hour)},
+			}
+			for _, n := range []int{10, 2, 1} {
+				id := fmt.Sprintf("child-%d", n)
+				issues = append(issues, model.Issue{ID: id, Title: fmt.Sprintf("[szgb.%d] Step", n), IssueType: model.TypeTask,
+					CreatedAt:    now.Add(time.Duration(n) * time.Minute),
+					Dependencies: []*model.Dependency{{IssueID: id, DependsOnID: "epic", Type: model.DepParentChild}}})
+			}
+			for _, parent := range []string{"child-1", "nested"} {
+				for _, n := range []int{10, 2, 1} {
+					id := fmt.Sprintf("%s-%d", parent, n)
+					issues = append(issues, model.Issue{ID: id, Title: fmt.Sprintf("Phase %d", n), IssueType: model.TypeTask,
+						CreatedAt:    now.Add(time.Duration(n) * time.Minute),
+						Dependencies: []*model.Dependency{{IssueID: id, DependsOnID: parent, Type: model.DepParentChild}}})
+				}
+			}
+			issues = append(issues, model.Issue{ID: "nested", Title: "Nested epic", IssueType: model.TypeEpic,
+				Dependencies: []*model.Dependency{{IssueID: "nested", DependsOnID: "child-2", Type: model.DepParentChild}}})
+			tree := NewTreeModel(newTreeTestTheme())
+			tree.Build(issues)
+			tree.SetSort(SortFieldCreated, dir)
+			wantRoot := "epic"
+			if dir == SortAscending {
+				wantRoot = "older"
+			}
+			if tree.roots[0].Issue.ID != wantRoot {
+				t.Fatalf("root = %s, want %s", tree.roots[0].Issue.ID, wantRoot)
+			}
+			epic := tree.roots[0]
+			if dir == SortAscending {
+				epic = tree.roots[1]
+			}
+			for i, want := range []string{"child-1", "child-2", "child-10"} {
+				if got := epic.Children[i].Issue.ID; got != want {
+					t.Errorf("child %d = %s, want %s", i, got, want)
+				}
+			}
+			for _, parent := range []*IssueTreeNode{epic.Children[0], epic.Children[1].Children[0]} {
+				for i, n := range []int{1, 2, 10} {
+					want := fmt.Sprintf("%s-%d", parent.Issue.ID, n)
+					if got := parent.Children[i].Issue.ID; got != want {
+						t.Errorf("descendant %d = %s, want %s", i, got, want)
+					}
+				}
+			}
+		})
 	}
 }
 

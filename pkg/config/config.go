@@ -1,9 +1,9 @@
-// Package config handles loading and saving b9sconfiguration.
+// Package config handles loading and saving b9s configuration.
 //
 // Configuration follows the XDG Base Directory specification:
-//   - Config:  ~/.config/bw/config.yaml
-//   - Data:    ~/.local/share/bw/ (themes, plugins)
-//   - State:   ~/.local/state/bw/ (recent projects, view state cache)
+//   - Config:  ~/.config/b9s/config.yaml
+//   - Data:    ~/.local/share/b9s/ (themes, plugins)
+//   - State:   ~/.local/state/b9s/ (recent projects, view state cache)
 package config
 
 import (
@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -25,13 +26,42 @@ type Project struct {
 type UIConfig struct {
 	DefaultView string  `yaml:"default_view,omitempty"` // list, tree, board, split
 	SplitRatio  float64 `yaml:"split_ratio,omitempty"`  // Default split pane ratio (0.2-0.8)
-	Headless    bool    `yaml:"headless,omitempty"`      // Compact header mode
+	Headless    bool    `yaml:"headless,omitempty"`     // Compact header mode
 }
 
 // DiscoveryConfig controls auto-discovery of projects.
 type DiscoveryConfig struct {
 	ScanPaths []string `yaml:"scan_paths,omitempty"` // Directories to scan for .beads/
 	MaxDepth  int      `yaml:"max_depth,omitempty"`  // How deep to scan (default 3)
+}
+
+const (
+	DefaultRefreshPollInterval = 500 * time.Millisecond
+	minimumRefreshPollInterval = 100 * time.Millisecond
+)
+
+// RefreshInterval is a human-readable duration used in YAML configuration.
+type RefreshInterval time.Duration
+
+func (d *RefreshInterval) UnmarshalYAML(node *yaml.Node) error {
+	parsed, err := time.ParseDuration(strings.TrimSpace(node.Value))
+	if err != nil {
+		return fmt.Errorf("invalid refresh poll interval %q: %w", node.Value, err)
+	}
+	if parsed < minimumRefreshPollInterval {
+		return fmt.Errorf("refresh poll interval must be at least %s", minimumRefreshPollInterval)
+	}
+	*d = RefreshInterval(parsed)
+	return nil
+}
+
+func (d RefreshInterval) MarshalYAML() (any, error) {
+	return time.Duration(d).String(), nil
+}
+
+// RefreshConfig controls automatic data refresh behavior.
+type RefreshConfig struct {
+	PollInterval RefreshInterval `yaml:"poll_interval,omitempty"`
 }
 
 // ExperimentalConfig holds experimental feature flags.
@@ -45,6 +75,7 @@ type Config struct {
 	Favorites    map[int]string     `yaml:"favorites,omitempty"` // Number key (1-9) -> project name
 	UI           UIConfig           `yaml:"ui,omitempty"`
 	Discovery    DiscoveryConfig    `yaml:"discovery,omitempty"`
+	Refresh      RefreshConfig      `yaml:"refresh,omitempty"`
 	Experimental ExperimentalConfig `yaml:"experimental,omitempty"`
 }
 
@@ -59,7 +90,20 @@ func DefaultConfig() Config {
 		Discovery: DiscoveryConfig{
 			MaxDepth: 3,
 		},
+		Refresh: RefreshConfig{
+			PollInterval: RefreshInterval(DefaultRefreshPollInterval),
+		},
 	}
+}
+
+// RefreshPollInterval returns the configured interval or the default when a
+// Config value was assembled programmatically without refresh settings.
+func (c Config) RefreshPollInterval() time.Duration {
+	interval := time.Duration(c.Refresh.PollInterval)
+	if interval == 0 {
+		return DefaultRefreshPollInterval
+	}
+	return interval
 }
 
 // ConfigDir returns the XDG config directory for b9s.

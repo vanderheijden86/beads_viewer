@@ -29,7 +29,7 @@ No web page loads, no heavy clients. `bw` starts instantly and lets you fly thro
 *   **Split-View Dashboard:** On wider screens, see your list on the left and full details on the right.
 *   **Markdown Rendering:** Issue descriptions, comments, and notes are beautifully rendered with syntax highlighting, headers, and lists.
 *   **Instant Filtering:** Zero-latency filtering. Press `o` for Open, `c` for Closed, or `r` for Ready (unblocked) tasks.
-*   **Live Reload:** Watches `.beads/beads.jsonl` and refreshes lists, details, and insights automatically when the file changes—no restart needed.
+*   **Live Reload:** Watches JSONL files and polls the Dolt working-set hash, then refreshes the UI automatically when issue data changes. Press `Ctrl+R` or `F5` for an immediate refresh.
 
 ### 🔎 Rich Context
 Don't just read the title. `bw` gives you the full picture:
@@ -2473,6 +2473,7 @@ The JSONL parser is designed to be **Lossy-Tolerant**.
     # or
     BW_FORCE_POLL=1 bw
     ```
+*   Dolt server projects always use working-set polling. Press `Ctrl+R` or `F5` to refresh immediately, or configure the polling interval as shown below.
 
 **Q: I see `polling …` in the footer. Is that bad?**
 No — it just means `bw` is using polling instead of filesystem events for live reload (common on remote filesystems). Polling can add a small delay before updates appear.
@@ -2573,11 +2574,30 @@ bw has a comprehensive built-in help system:
 | | `'` | Recipe Picker |
 | | `w` | Repo Picker (workspace mode) |
 
+### Search and filters compose
+
+Free-text search (`/`) narrows what the active filters already show; it never replaces them.
+
+- **While the search bar is open, every keystroke goes into the query.** Global shortcuts are suspended until you leave search, so typing a query containing `a` (clear filters), a digit (label/project selection), `?`, `H`, `P` or `D` no longer triggers those actions. Leave search with `Esc` (cancel the query) or `Enter` (keep the results and close the bar).
+- **Search results are scoped to the active label, assignee, and status filters**, so the match count and `n` / `N` navigation only cover issues you can actually see. Changing a filter while a query is active re-scopes the matches. In XRay mode (`x`), search is scoped to the drilled-down subtree.
+- **Occur mode (`O`) turns the query into a filter** and ANDs with the label/assignee/status filter instead of replacing it.
+
 ---
 
 ## 🛠️ Configuration
 
 `bw` automatically detects your terminal capabilities to render the best possible UI. It looks for `.beads/beads.jsonl` in your current directory.
+
+### Dolt Refresh Interval
+
+B9s checks the Dolt working-set hash every 500 milliseconds by default. This detects issue changes before they are committed and requires no database change stream or WebSocket. Set a different interval in `~/.config/b9s/config.yaml`:
+
+```yaml
+refresh:
+  poll_interval: 2s
+```
+
+The minimum interval is 100 milliseconds. Restart B9s after changing it. `Ctrl+R` and `F5` always trigger an immediate refresh.
 
 ### Environment Variables
 

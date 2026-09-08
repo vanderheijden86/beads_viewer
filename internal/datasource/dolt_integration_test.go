@@ -187,7 +187,7 @@ func testDB(t *testing.T) (dbName string, addr string, cleanup func()) {
 		t.Fatalf("cannot use test database: %v", err)
 	}
 
-	// Create beads schema (bd v0.63 compatible — minimal columns needed by DoltReader)
+	// Create the current Beads schema subset needed by DoltReader.
 	schema := []string{
 		`CREATE TABLE issues (
 			id VARCHAR(255) PRIMARY KEY,
@@ -218,12 +218,16 @@ func testDB(t *testing.T) (dbName string, addr string, cleanup func()) {
 			PRIMARY KEY (issue_id, label)
 		)`,
 		`CREATE TABLE dependencies (
+			id CHAR(36) NOT NULL PRIMARY KEY,
 			issue_id VARCHAR(255) NOT NULL,
-			depends_on_id VARCHAR(255) NOT NULL,
 			type VARCHAR(32) NOT NULL DEFAULT 'blocks',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			created_by VARCHAR(255) NOT NULL DEFAULT '',
-			PRIMARY KEY (issue_id, depends_on_id)
+			metadata JSON,
+			thread_id VARCHAR(255),
+			depends_on_issue_id VARCHAR(255),
+			depends_on_wisp_id VARCHAR(255),
+			depends_on_external VARCHAR(255)
 		)`,
 		`CREATE TABLE comments (
 			id CHAR(36) NOT NULL PRIMARY KEY,
@@ -261,9 +265,10 @@ func testDB(t *testing.T) (dbName string, addr string, cleanup func()) {
 		`INSERT INTO labels (issue_id, label) VALUES ('test-001', 'auth')`,
 		`INSERT INTO labels (issue_id, label) VALUES ('test-001', 'urgent')`,
 
-		// Dependencies (column is `type` not `dependency_type` in v0.63)
-		`INSERT INTO dependencies (issue_id, depends_on_id, type) VALUES ('test-002', 'test-001', 'blocks')`,
-		`INSERT INTO dependencies (issue_id, depends_on_id, type) VALUES ('test-002', 'test-005', 'related')`,
+		// Dependencies use split target columns in the current Beads schema.
+		`INSERT INTO dependencies (id, issue_id, depends_on_issue_id, type) VALUES ('dep-001', 'test-002', 'test-001', 'blocks')`,
+		`INSERT INTO dependencies (id, issue_id, depends_on_external, type) VALUES ('dep-002', 'test-002', 'github:example/5', 'related')`,
+		`INSERT INTO dependencies (id, issue_id, depends_on_wisp_id, type) VALUES ('dep-003', 'test-002', 'wisp:review', 'waits-for')`,
 
 		// Comments (id is CHAR(36) UUID in v0.63)
 		fmt.Sprintf(`INSERT INTO comments (id, issue_id, author, text, created_at) VALUES ('cmt-001', 'test-001', 'bob', 'Reproduced on staging', '%s')`, now),
@@ -519,8 +524,8 @@ func TestDoltIntegration_Dependencies(t *testing.T) {
 		t.Fatalf("GetIssueByID failed: %v", err)
 	}
 
-	if len(issue.Dependencies) != 2 {
-		t.Fatalf("expected 2 dependencies, got %d", len(issue.Dependencies))
+	if len(issue.Dependencies) != 3 {
+		t.Fatalf("expected 3 dependencies, got %d", len(issue.Dependencies))
 	}
 
 	depMap := make(map[string]string)
@@ -534,8 +539,11 @@ func TestDoltIntegration_Dependencies(t *testing.T) {
 	if depMap["test-001"] != "blocks" {
 		t.Errorf("expected blocks dependency on test-001, got %q", depMap["test-001"])
 	}
-	if depMap["test-005"] != "related" {
-		t.Errorf("expected related dependency on test-005, got %q", depMap["test-005"])
+	if depMap["github:example/5"] != "related" {
+		t.Errorf("expected related external dependency, got %q", depMap["github:example/5"])
+	}
+	if depMap["wisp:review"] != "waits-for" {
+		t.Errorf("expected waits-for wisp dependency, got %q", depMap["wisp:review"])
 	}
 }
 
@@ -810,6 +818,64 @@ func TestDoltIntegration_WatcherDetectsChange(t *testing.T) {
 	}
 }
 
+func TestDoltIntegration_WatcherDetectsUncommittedWorkingSetChange(t *testing.T) {
+	skipIfNoDoltIntegration(t)
+	dbName, addr, cleanup := testDB(t)
+	defer cleanup()
+
+	user := os.Getenv("B9S_TEST_DOLT_USER")
+	if user == "" {
+		user = "root"
+	}
+
+	source := DataSource{
+		Type:     SourceTypeDolt,
+		Path:     addr,
+		Database: dbName,
+		User:     user,
+	}
+	dw, err := NewDoltWatcher(source, 50*time.Millisecond)
+	if err != nil {
+		t.Fatalf("NewDoltWatcher failed: %v", err)
+	}
+	defer dw.Stop()
+	if err := dw.Start(); err != nil {
+		t.Fatalf("watcher Start failed: %v", err)
+	}
+
+	reader := newTestDoltReader(t, dbName, addr)
+	defer reader.Close()
+	headBefore, err := reader.GetHeadHash()
+	if err != nil {
+		t.Fatalf("GetHeadHash before mutation failed: %v", err)
+	}
+
+	dsn := buildDSN(user, os.Getenv("BEADS_DOLT_PASSWORD"), addr, dbName)
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatalf("cannot open mutation connection: %v", err)
+	}
+	defer db.Close()
+	if _, err := db.Exec(`INSERT INTO issues (id, title, status, priority, issue_type, created_at, updated_at)
+		VALUES ('test-working-set', 'Uncommitted issue', 'open', 2, 'task', NOW(), NOW())`); err != nil {
+		t.Fatalf("insert failed: %v", err)
+	}
+
+	headAfter, err := reader.GetHeadHash()
+	if err != nil {
+		t.Fatalf("GetHeadHash after mutation failed: %v", err)
+	}
+	if headBefore != headAfter {
+		t.Fatal("test setup committed the mutation; expected HEAD to remain unchanged")
+	}
+
+	select {
+	case <-dw.Changed():
+	case <-time.After(2 * time.Second):
+		t.Fatal("watcher did not detect the uncommitted working-set change")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Test: Write-then-read cycle (simulates b9s edit flow)
 // ---------------------------------------------------------------------------
@@ -939,7 +1005,7 @@ func TestDoltIntegration_EmptyDatabase(t *testing.T) {
 		source_repo VARCHAR(512) DEFAULT ''
 	)`)
 	db.Exec(`CREATE TABLE labels (issue_id VARCHAR(255) NOT NULL, label VARCHAR(255) NOT NULL, PRIMARY KEY(issue_id, label))`)
-	db.Exec(`CREATE TABLE dependencies (issue_id VARCHAR(255) NOT NULL, depends_on_id VARCHAR(255) NOT NULL, type VARCHAR(32) NOT NULL DEFAULT 'blocks', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, created_by VARCHAR(255) NOT NULL DEFAULT '', PRIMARY KEY(issue_id, depends_on_id))`)
+	db.Exec(`CREATE TABLE dependencies (id CHAR(36) NOT NULL PRIMARY KEY, issue_id VARCHAR(255) NOT NULL, type VARCHAR(32) NOT NULL DEFAULT 'blocks', created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, created_by VARCHAR(255) NOT NULL DEFAULT '', metadata JSON, thread_id VARCHAR(255), depends_on_issue_id VARCHAR(255), depends_on_wisp_id VARCHAR(255), depends_on_external VARCHAR(255))`)
 	db.Exec(`CREATE TABLE comments (id CHAR(36) NOT NULL PRIMARY KEY, issue_id VARCHAR(255) NOT NULL, author VARCHAR(255) NOT NULL, text TEXT NOT NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`)
 
 	reader := newTestDoltReader(t, dbName, addr)
@@ -1181,8 +1247,8 @@ func TestDoltIntegration_AddDependencyAndReadBack(t *testing.T) {
 	}
 
 	// Add a dependency (simulates bd dep add)
-	_, err = db.Exec(`INSERT INTO dependencies (issue_id, depends_on_id, type)
-		VALUES ('test-003', 'test-001', 'blocks')`)
+	_, err = db.Exec(`INSERT INTO dependencies (id, issue_id, depends_on_issue_id, type)
+		VALUES ('dep-004', 'test-003', 'test-001', 'blocks')`)
 	if err != nil {
 		t.Fatalf("INSERT dep failed: %v", err)
 	}
