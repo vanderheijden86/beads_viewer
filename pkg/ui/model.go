@@ -705,6 +705,14 @@ type WorkspaceInfo struct {
 	RepoPrefixes []string
 }
 
+func issueIDs(issues []model.Issue) []string {
+	ids := make([]string, len(issues))
+	for i := range issues {
+		ids[i] = issues[i].ID
+	}
+	return ids
+}
+
 func (m *Model) updateListDelegate() {
 	projectName := m.activeProjectName
 	if m.allProjectsMode {
@@ -888,6 +896,7 @@ func NewModel(issues []model.Issue, beadsPath string) Model {
 	// Build tree and set size so tree view is ready on launch (bd-dxc)
 	treeModel.Build(issues)
 	treeModel.SetSize(defaultWidth, defaultHeight-2)
+	treeModel.DetectAndFollowChanges(issueIDs(issues))
 
 	return Model{
 		issues:              issues,
@@ -1386,6 +1395,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tree.BuildFromSnapshot(m.snapshot)
 		m.tree.SetSize(m.width, m.bodyHeight())
 		m.tree.SetGlobalIssueMap(m.issueMap)
+		m.tree.DetectAndFollowChanges(issueIDs(m.issues))
 
 		// Refresh detail pane if visible
 		if m.isSplitView || m.showDetails {
@@ -1776,6 +1786,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.tree.Build(m.issues)
 			m.tree.SetSize(m.width, m.bodyHeight())
 			m.tree.SetGlobalIssueMap(m.issueMap)
+			m.tree.DetectAndFollowChanges(issueIDs(m.issues))
 			if profileRefresh {
 				recordTiming("tree_rebuild", time.Since(treeStart))
 			}
