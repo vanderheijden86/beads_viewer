@@ -2579,6 +2579,7 @@ bw has a comprehensive built-in help system:
 Free-text search (`/`) narrows what the active filters already show; it never replaces them.
 
 - **While the search bar is open, every keystroke goes into the query.** Global shortcuts are suspended until you leave search, so typing a query containing `a` (clear filters), a digit (label/project selection), `?`, `H`, `P` or `D` no longer triggers those actions. Leave search with `Esc` (cancel the query) or `Enter` (keep the results and close the bar).
+- **The active match is revealed with surrounding context.** Search jumps place a distant match near the upper third of the tree viewport instead of pinning it to the bottom edge. After `Enter`, the accepted query and match count remain visible while `n` / `N` navigation is available.
 - **Search results are scoped to the active label, assignee, and status filters**, so the match count and `n` / `N` navigation only cover issues you can actually see. Changing a filter while a query is active re-scopes the matches. In XRay mode (`x`), search is scoped to the drilled-down subtree.
 - **Occur mode (`O`) turns the query into a filter** and ANDs with the label/assignee/status filter instead of replacing it.
 

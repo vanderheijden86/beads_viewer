@@ -1158,8 +1158,9 @@ func (t *TreeModel) View() string {
 		sb.WriteString(indicator)
 	}
 
-	// Show search bar when search mode is active (bd-wf8)
-	if t.searchMode {
+	// Keep accepted queries visible so highlighted matches and n/N navigation
+	// always have an on-screen explanation.
+	if t.searchMode || t.searchQuery != "" {
 		sb.WriteString("\n")
 		sb.WriteString(t.renderSearchBar())
 	}
@@ -2351,6 +2352,9 @@ func (t *TreeModel) effectiveVisibleCount() int {
 	if visibleCount <= 0 {
 		visibleCount = 19 // Default: 20 minus 1 for header
 	}
+	if t.searchMode || t.searchQuery != "" {
+		visibleCount--
+	}
 	// Reserve 1 more line for the position indicator when scrolling is needed
 	if len(t.flatList) > visibleCount {
 		visibleCount--
@@ -2383,6 +2387,28 @@ func (t *TreeModel) ensureCursorVisible() {
 	}
 
 	// Clamp offset to valid range
+	maxOffset := len(t.flatList) - visibleCount
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if t.viewportOffset > maxOffset {
+		t.viewportOffset = maxOffset
+	}
+	if t.viewportOffset < 0 {
+		t.viewportOffset = 0
+	}
+}
+
+// revealCursorWithContext positions the selected row near the upper third of
+// the viewport so jumps retain useful context both before and after the match.
+func (t *TreeModel) revealCursorWithContext() {
+	if len(t.flatList) == 0 {
+		return
+	}
+
+	visibleCount := t.effectiveVisibleCount()
+	t.viewportOffset = t.cursor - visibleCount/3
+
 	maxOffset := len(t.flatList) - visibleCount
 	if maxOffset < 0 {
 		maxOffset = 0
@@ -2529,7 +2555,7 @@ func (t *TreeModel) executeSearch() {
 		t.expandPathToNode(t.searchMatches[0])
 		t.rebuildFlatList()
 		t.SelectByID(t.searchMatches[0].Issue.ID)
-		t.ensureCursorVisible()
+		t.revealCursorWithContext()
 	}
 }
 
@@ -2598,7 +2624,7 @@ func (t *TreeModel) NextSearchMatch() {
 	t.expandPathToNode(match)
 	t.rebuildFlatList()
 	t.SelectByID(match.Issue.ID)
-	t.ensureCursorVisible()
+	t.revealCursorWithContext()
 }
 
 // PrevSearchMatch cycles backward through search matches (N key).
@@ -2614,7 +2640,7 @@ func (t *TreeModel) PrevSearchMatch() {
 	t.expandPathToNode(match)
 	t.rebuildFlatList()
 	t.SelectByID(match.Issue.ID)
-	t.ensureCursorVisible()
+	t.revealCursorWithContext()
 }
 
 // expandPathToNode expands all ancestors so the node becomes visible.

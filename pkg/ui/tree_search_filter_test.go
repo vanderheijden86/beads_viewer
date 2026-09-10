@@ -3,8 +3,11 @@
 package ui
 
 import (
+	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -286,5 +289,73 @@ func TestTreeOccurModeComposesWithLabelFilter(t *testing.T) {
 	tree.ExitOccurMode()
 	if got := tree.NodeCount(); got != 2 {
 		t.Errorf("after exiting occur, visible = %d (%v), want the 2 label-filtered nodes", got, treeVisibleIDs(&tree))
+	}
+}
+
+func searchViewportIssues(count int, matchIndex int) []model.Issue {
+	issues := make([]model.Issue, 0, count)
+	base := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	for i := 0; i < count; i++ {
+		title := fmt.Sprintf("Ordinary task %02d", i)
+		if i == matchIndex {
+			title = "Needle epic"
+		}
+		issues = append(issues, model.Issue{
+			ID:        fmt.Sprintf("bd-%02d", i),
+			Title:     title,
+			Status:    model.StatusOpen,
+			IssueType: model.TypeTask,
+			CreatedAt: base.Add(time.Duration(count-i) * time.Minute),
+		})
+	}
+	return issues
+}
+
+func TestTreeSearchRevealsMatchWithContext(t *testing.T) {
+	tree := NewTreeModel(newTreeTestTheme())
+	tree.SetBeadsDir(filepath.Join(t.TempDir(), ".beads"))
+	tree.SetSize(100, 12)
+	tree.Build(searchViewportIssues(40, 32))
+
+	tree.EnterSearchMode()
+	for _, ch := range "needle" {
+		tree.SearchAddChar(ch)
+	}
+
+	start, _ := tree.visibleRange()
+	row := tree.cursor - start
+	if maxComfortableRow := tree.effectiveVisibleCount() / 2; row > maxComfortableRow {
+		t.Fatalf("search match rendered at viewport row %d, want at or above %d", row, maxComfortableRow)
+	}
+}
+
+func TestTreeSearchBarReservesViewportLine(t *testing.T) {
+	tree := NewTreeModel(newTreeTestTheme())
+	tree.SetBeadsDir(filepath.Join(t.TempDir(), ".beads"))
+	tree.SetSize(100, 12)
+	tree.Build(searchViewportIssues(40, 32))
+	tree.EnterSearchMode()
+
+	start, end := tree.visibleRange()
+	visibleRows := end - start
+	// Header, position indicator, and search bar each consume one line.
+	if wantMax := tree.height - 3; visibleRows > wantMax {
+		t.Fatalf("visible rows = %d, want at most %d while search bar is shown", visibleRows, wantMax)
+	}
+}
+
+func TestTreeAcceptedSearchKeepsQueryIndicatorVisible(t *testing.T) {
+	tree := NewTreeModel(newTreeTestTheme())
+	tree.SetBeadsDir(filepath.Join(t.TempDir(), ".beads"))
+	tree.SetSize(100, 12)
+	tree.Build(searchViewportIssues(10, 5))
+	tree.EnterSearchMode()
+	for _, ch := range "needle" {
+		tree.SearchAddChar(ch)
+	}
+	tree.ExitSearchMode()
+
+	if view := tree.View(); !strings.Contains(view, "needle") {
+		t.Fatalf("accepted search query is absent from tree view:\n%s", view)
 	}
 }
