@@ -253,6 +253,7 @@ type TreeModel struct {
 	currentFilter    string                  // "all", "open", "closed", "ready"
 	labelFilter      string                  // "" = no label filter, "bug" = filter to label (bd-dlqi)
 	assigneeFilter   string                  // "" = no assignee filter (bd-gs45.1)
+	issueQuery       IssueQuery              // Shared ID/title/facet query owned by Model
 	filterMatches    map[string]bool         // Issue IDs that match the filter
 	contextAncestors map[string]bool         // Ancestor IDs shown for context (dimmed)
 	globalIssueMap   map[string]*model.Issue // Reference to global issue map (for blocker checks in "ready" filter)
@@ -951,6 +952,12 @@ func (t *TreeModel) SetAssigneeFilter(assignee string) {
 	t.ApplyFilter(t.currentFilter) // rebuild with all filters
 }
 
+// SetIssueQuery applies the shared cross-view query to the tree.
+func (t *TreeModel) SetIssueQuery(query IssueQuery) {
+	t.issueQuery = query
+	t.ApplyFilter(t.currentFilter)
+}
+
 // ApplyFilter sets the current filter and rebuilds the visible flat list (bd-e3w).
 func (t *TreeModel) ApplyFilter(filter string) {
 	t.currentFilter = filter
@@ -958,7 +965,7 @@ func (t *TreeModel) ApplyFilter(filter string) {
 		t.currentFilter = "all"
 	}
 	// When status, label, and assignee are all "show all", skip filtering
-	if t.currentFilter == "all" && t.labelFilter == "" && t.assigneeFilter == "" {
+	if t.currentFilter == "all" && t.labelFilter == "" && t.assigneeFilter == "" && t.issueQuery.Empty() {
 		t.filterMatches = nil
 		t.contextAncestors = nil
 		t.refreshSearchMatches() // matches are scoped to the filter (bd-oe1y)
@@ -1006,6 +1013,9 @@ func (t *TreeModel) nodeMatchesFilter(node *IssueTreeNode) bool {
 		return false
 	}
 	issue := node.Issue
+	if !t.issueQuery.Matches(*issue) {
+		return false
+	}
 
 	// Label filter (AND with status filter) (bd-dlqi)
 	if t.labelFilter != "" {
@@ -2206,7 +2216,7 @@ func (t *TreeModel) rebuildFlatList() {
 		t.rebuildFlatModeList()
 		return
 	}
-	if t.filterMatches != nil && (t.labelFilter != "" || t.assigneeFilter != "" || (t.currentFilter != "" && t.currentFilter != "all")) {
+	if t.filterMatches != nil && (!t.issueQuery.Empty() || t.labelFilter != "" || t.assigneeFilter != "" || (t.currentFilter != "" && t.currentFilter != "all")) {
 		t.rebuildFilteredFlatList()
 		// Occur narrows the filtered set further; it must not be dropped just
 		// because a label/assignee/status filter is also active (bd-oe1y).
@@ -2573,13 +2583,7 @@ func (t *TreeModel) refreshSearchMatches() {
 		return
 	}
 
-	// Check if this is an advanced filter query (bd-08h)
-	var preds []FilterPredicate
-	useAdvanced := isAdvancedQuery(t.searchQuery)
-	if useAdvanced {
-		preds = ParseFilterPredicates(t.searchQuery)
-	}
-	query := strings.ToLower(t.searchQuery)
+	query := ParseIssueQuery(t.searchQuery)
 
 	// Walk ALL nodes (including collapsed ones)
 	var walk func(node *IssueTreeNode)
@@ -2588,15 +2592,7 @@ func (t *TreeModel) refreshSearchMatches() {
 			return
 		}
 
-		var matches bool
-		if useAdvanced {
-			matches = t.nodeMatchesAdvancedFilter(node, preds)
-		} else {
-			matches = strings.Contains(strings.ToLower(node.Issue.Title), query) ||
-				strings.Contains(strings.ToLower(node.Issue.ID), query)
-		}
-
-		if matches && t.isSearchable(node) {
+		if query.Matches(*node.Issue) && t.isSearchable(node) {
 			t.searchMatches = append(t.searchMatches, node)
 			t.searchMatchIDs[node.Issue.ID] = true
 		}

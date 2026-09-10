@@ -404,9 +404,10 @@ type Model struct {
 	assigneeScrollOffset int             // scroll offset for assignee bar when >9 assignees (bd-gs45.1)
 
 	// Filter and sort state
-	currentFilter  string   // status filter: "all", "open", "closed", "ready"
-	labelFilter    string   // label filter: "" = none, "bug" = filter to label "bug" (bd-dlqi)
-	assigneeFilter string   // assignee filter: "" = none (bd-gs45.1)
+	currentFilter  string // status filter: "all", "open", "closed", "ready"
+	labelFilter    string // label filter: "" = none, "bug" = filter to label "bug" (bd-dlqi)
+	assigneeFilter string // assignee filter: "" = none (bd-gs45.1)
+	queryState     QueryState
 	sortMode       SortMode // bv-3ita: current sort mode
 
 	// Stats (cached)
@@ -4394,6 +4395,10 @@ func (m *Model) clearAllFilters() {
 }
 
 func (m *Model) matchesCurrentFilter(issue model.Issue) bool {
+	if !m.queryState.Matches(issue) {
+		return false
+	}
+
 	// Workspace repo filter (nil = all repos)
 	if m.workspaceMode && m.activeRepos != nil {
 		repoKey := strings.ToLower(ExtractRepoPrefix(issue.ID))
@@ -4457,6 +4462,13 @@ func (m *Model) matchesCurrentFilter(issue model.Issue) bool {
 		}
 		return false
 	}
+}
+
+// setQueryText is the single write path for the cross-view issue query.
+func (m *Model) setQueryText(text string) {
+	m.queryState.SetText(text)
+	m.tree.SetIssueQuery(m.queryState.Query())
+	m.applyFilter()
 }
 
 func (m *Model) filteredIssuesForActiveView() []model.Issue {

@@ -290,23 +290,22 @@ This visual encoding is applied to badges in the Insights Dashboard, allowing yo
 
 In a project with thousands of issues, you cannot afford to wait for a backend query. `bw` implements a **composite, in-memory fuzzy search** that feels instantaneous.
 
-### The "Flattened Vector" Index
-Instead of searching fields individually (which requires complex UI controls), `bw` flattens every issue into a single searchable "vector" at load time.
-The `FilterValue()` method constructs a composite string containing:
-*   **Core Identity:** ID (`"CORE-123"`) and Title (`"Fix login race condition"`)
-*   **Metadata:** Status (`"open"`), Type (`"bug"`), Priority
-*   **Context:** Assignee (`"@steve"`) and Labels (`"frontend, v1.0"`)
+### Canonical issue query
 
-### Fuzzy Subsequence Matching
-When you press `/`, the search engine performs a **fuzzy subsequence match** against this composite vector.
-*   **Example:** Typing `"log fix"` successfully matches `"Fix login race condition"`.
-*   **Example:** Typing `"steve bug"` finds bugs assigned to Steve.
-*   **Example:** Typing `"open v1.0"` filters for open items in the v1.0 release.
+The root TUI model owns one query string and parses it into an immutable issue query before deriving view data. List, tree, and board therefore receive the same result set instead of implementing their own matching rules.
+
+Plain text searches ID and title. Structured predicates narrow a field explicitly:
+
+*   `id:sxgr` matches issue IDs containing `sxgr`.
+*   `status:open status:blocked type:epic` matches open or blocked epics.
+*   `priority:p1 label:frontend assignee:steve` composes three facets.
+
+Positive values within one field use OR semantics. Different fields and negated predicates use AND semantics. Supported fields are ID, title, status, priority, type, label, assignee, and project.
 
 ### Performance Characteristics
-*   **Zero Allocation:** The search index is built once during the initial load (`loader.LoadIssues`).
-*   **Client-Side Filtering:** Filtering happens entirely within the render loop. There is no database latency, no network round-trip, and no "loading" spinner.
-*   **Stable Sort:** Search results maintain the topological and priority sorting of the main list, ensuring that even filtered views reflect the project's true priorities.
+*   **Client-Side Filtering:** Query evaluation uses already-loaded issues. There is no database latency or network round trip.
+*   **Stable Sort:** Query results maintain the active view's ordering.
+*   **One Writer:** Only the root model mutates query text and editing state. Views retain derived cursor and highlight state only.
 
 ---
 

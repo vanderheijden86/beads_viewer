@@ -736,12 +736,10 @@ func (b *BoardModel) updateSearchMatches() {
 	if b.searchQuery == "" {
 		return
 	}
-	query := strings.ToLower(b.searchQuery)
+	query := ParseIssueQuery(b.searchQuery)
 	for colIdx, issues := range b.columns {
 		for rowIdx, issue := range issues {
-			idLower := strings.ToLower(issue.ID)
-			titleLower := strings.ToLower(issue.Title)
-			if strings.Contains(idLower, query) || strings.Contains(titleLower, query) {
+			if query.Matches(issue) {
 				b.searchMatches = append(b.searchMatches, searchMatch{col: colIdx, row: rowIdx})
 			}
 		}
