@@ -52,6 +52,20 @@ const (
 	focusEditModal
 )
 
+type issueConfirmAction uint8
+
+const (
+	issueConfirmNone issueConfirmAction = iota
+	issueConfirmClose
+	issueConfirmDelete
+)
+
+type issueConfirmation struct {
+	action issueConfirmAction
+	id     string
+	title  string
+}
+
 // SortMode represents the current list sorting mode (bv-3ita)
 // Picker mode: what the top bar shows (bd-gj41)
 const (
@@ -430,9 +444,7 @@ type Model struct {
 	showHelp             bool
 	helpScroll           int // Scroll offset for help overlay
 	showQuitConfirm      bool
-	showDeleteConfirm    bool           // True when delete confirmation dialog is visible
-	deleteTargetID       string         // Issue ID pending deletion
-	deleteTargetTitle    string         // Issue title for confirmation display
+	issueConfirm         issueConfirmation
 	showDBHealth         bool           // True when database health popup is visible
 	dbHealth             DatabaseHealth // Cached result of the last health check
 	ready                bool
@@ -2027,19 +2039,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Handle delete confirmation (bd-578q)
-		if m.showDeleteConfirm {
+		if m.issueConfirm.action != issueConfirmNone {
 			switch msg.String() {
 			case "y", "Y":
-				m.showDeleteConfirm = false
-				id := m.deleteTargetID
-				m.deleteTargetID = ""
-				m.deleteTargetTitle = ""
-				return m, m.issueWriter.DeleteIssue(id)
+				confirmation := m.issueConfirm
+				m.issueConfirm = issueConfirmation{}
+				switch confirmation.action {
+				case issueConfirmClose:
+					return m, m.issueWriter.CloseIssue(confirmation.id, "")
+				case issueConfirmDelete:
+					return m, m.issueWriter.DeleteIssue(confirmation.id)
+				}
 			default:
-				m.showDeleteConfirm = false
-				m.deleteTargetID = ""
-				m.deleteTargetTitle = ""
+				m.issueConfirm = issueConfirmation{}
 				return m, nil
 			}
 		}
@@ -2553,15 +2565,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			case "K":
 				if m.allProjectsMode {
+					m.statusMsg = "Closing disabled in all-projects view"
+					m.statusIsError = false
+					return m, nil
+				}
+				if issue := m.getSelectedIssue(); issue != nil {
+					m.issueConfirm = issueConfirmation{
+						action: issueConfirmClose,
+						id:     issue.ID,
+						title:  issue.Title,
+					}
+					return m, nil
+				}
+
+			case "delete":
+				if m.allProjectsMode {
 					m.statusMsg = "Deleting disabled in all-projects view"
 					m.statusIsError = false
 					return m, nil
 				}
-				// Delete/discard issue (bd-578q)
 				if issue := m.getSelectedIssue(); issue != nil {
-					m.deleteTargetID = issue.ID
-					m.deleteTargetTitle = issue.Title
-					m.showDeleteConfirm = true
+					m.issueConfirm = issueConfirmation{
+						action: issueConfirmDelete,
+						id:     issue.ID,
+						title:  issue.Title,
+					}
 					return m, nil
 				}
 
@@ -3444,8 +3472,8 @@ func (m Model) View() string {
 	isOverlay := false // Track whether an overlay is active (no global header)
 
 	// Confirmation overlays take highest priority
-	if m.showDeleteConfirm {
-		body = m.renderDeleteConfirm()
+	if m.issueConfirm.action != issueConfirmNone {
+		body = m.renderIssueConfirm()
 		isOverlay = true
 	} else if m.showQuitConfirm {
 		body = m.renderQuitConfirm()
@@ -3583,8 +3611,7 @@ func (m Model) renderQuitConfirm() string {
 	)
 }
 
-// renderDeleteConfirm renders the centered delete confirmation dialog (bd-578q).
-func (m Model) renderDeleteConfirm() string {
+func (m Model) renderIssueConfirm() string {
 	t := m.theme
 
 	boxStyle := t.Renderer.NewStyle().
@@ -3608,16 +3635,25 @@ func (m Model) renderDeleteConfirm() string {
 		Foreground(t.Primary).
 		Bold(true)
 
-	title := m.deleteTargetTitle
+	title := m.issueConfirm.title
 	if len(title) > 50 {
 		title = title[:47] + "..."
 	}
 
-	content := titleStyle.Render("Delete issue?") + "\n\n" +
-		idStyle.Render(m.deleteTargetID) + "\n" +
+	heading := "Close issue?"
+	confirmLabel := "Close"
+	warning := "The issue remains available in closed history."
+	if m.issueConfirm.action == issueConfirmDelete {
+		heading = "Delete issue?"
+		confirmLabel = "Delete"
+		warning = "This is permanent and cannot be undone."
+	}
+
+	content := titleStyle.Render(heading) + "\n\n" +
+		idStyle.Render(m.issueConfirm.id) + "\n" +
 		textStyle.Render(title) + "\n\n" +
-		textStyle.Render("This is permanent and cannot be undone.") + "\n\n" +
-		textStyle.Render("Press ") + keyStyle.Render("Y") + textStyle.Render(" to delete, any other key to cancel")
+		textStyle.Render(warning) + "\n\n" +
+		keyStyle.Render("[Y] "+confirmLabel) + "  " + textStyle.Render("[Esc] Cancel")
 
 	box := boxStyle.Render(content)
 
@@ -4163,6 +4199,8 @@ func (m *Model) renderHelpOverlay() string {
 
 	actionsSection := []struct{ key, desc string }{
 		{"p", "Priority hints"},
+		{"K", "Close issue"},
+		{"Delete", "Delete issue"},
 		{"Ctrl+R", "Force refresh"},
 		{"F5", "Force refresh"},
 		{"t", "Time-travel"},
@@ -4364,7 +4402,8 @@ func (m *Model) renderFooter() string {
 			{"s", "sort"},
 			{"/", "search"},
 			{"e", "edit"},
-			{"K", "delete"},
+			{"K", "close"},
+			{"del", "delete"},
 			{"esc", "back"},
 		}
 	case "board":
@@ -4378,6 +4417,8 @@ func (m *Model) renderFooter() string {
 			{"m", "move"},
 			{"s", "swim"},
 			{"/", "search"},
+			{"K", "close"},
+			{"del", "delete"},
 			{"esc", "back"},
 		}
 	case "split":
@@ -4412,7 +4453,8 @@ func (m *Model) renderFooter() string {
 			{"s", "split"},
 			{"/", "filter"},
 			{"e", "edit"},
-			{"K", "delete"},
+			{"K", "close"},
+			{"del", "delete"},
 			{"n", "new"},
 			{"?", "help"},
 			{"esc", "back"},
@@ -5064,9 +5106,12 @@ func (m Model) FocusState() string {
 	}
 }
 
-// getSelectedIssue returns the currently selected issue from the active view (list or tree).
+// getSelectedIssue returns the currently selected issue from the active view.
 // Returns nil if no issue is selected.
 func (m *Model) getSelectedIssue() *model.Issue {
+	if m.isBoardView {
+		return m.board.SelectedIssue()
+	}
 	if m.focused == focusTree || m.treeViewActive {
 		id := m.tree.GetSelectedID()
 		if id != "" {
