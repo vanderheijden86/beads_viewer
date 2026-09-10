@@ -209,6 +209,17 @@ type workerPollTickMsg struct{}
 // PickerRefreshTickMsg triggers a periodic refresh of project picker counts (bd-8yc).
 type PickerRefreshTickMsg struct{}
 
+type projectCountsLoadedMsg struct {
+	counts map[string]projectCounts
+}
+
+type projectCounts struct {
+	open       int
+	inProgress int
+	ready      int
+	blocked    int
+}
+
 var workerSpinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 const (
@@ -234,6 +245,37 @@ func pickerRefreshTickCmd() tea.Cmd {
 	return tea.Tick(30*time.Second, func(time.Time) tea.Msg {
 		return PickerRefreshTickMsg{}
 	})
+}
+
+func loadProjectCountsCmd(projects []config.Project) tea.Cmd {
+	projects = append([]config.Project(nil), projects...)
+	return func() tea.Msg {
+		type result struct {
+			path   string
+			counts projectCounts
+			err    error
+		}
+
+		results := make(chan result, len(projects))
+		for _, project := range projects {
+			go func(project config.Project) {
+				path := project.ResolvedPath()
+				issues, err := datasource.LoadIssuesFromDir(filepath.Join(path, ".beads"))
+				results <- result{path: path, counts: summarizeProjectIssues(issues), err: err}
+			}(project)
+		}
+
+		counts := make(map[string]projectCounts, len(projects))
+		for range projects {
+			loaded := <-results
+			if loaded.err != nil {
+				debug.Log("project counts: load %s failed: %v", loaded.path, loaded.err)
+				continue
+			}
+			counts[loaded.path] = loaded.counts
+		}
+		return projectCountsLoadedMsg{counts: counts}
+	}
 }
 
 // ReadyTimeoutMsg is sent after a short delay to ensure the UI becomes ready
@@ -475,6 +517,7 @@ type Model struct {
 	appConfig         config.Config    // Loaded app configuration
 	allProjects       []config.Project // All known projects
 	projectPicker     ProjectPickerModel
+	projectCountCache map[string]projectCounts
 
 	// All-projects mode (bd-g68w): read-only cross-project view
 	allProjectsMode  bool
@@ -595,47 +638,22 @@ func (m Model) buildProjectEntries() []ProjectEntry {
 					entry.OpenCount++
 				}
 			}
+		} else if counts, ok := m.projectCountCache[p.ResolvedPath()]; ok {
+			entry.OpenCount = counts.open
+			entry.InProgressCount = counts.inProgress
+			entry.ReadyCount = counts.ready
+			entry.BlockedCount = counts.blocked
 		} else {
-			// Try to get counts from the project's beads file.
-			// Use silent warning handler to avoid corrupting TUI with stderr output (bd-lll).
-			// Count logic mirrors snapshot.go's counting (bd-qjc).
+			// Seed the picker from JSONL without writing parser warnings into the TUI
+			// while canonical project sources load asynchronously.
 			beadsPath := filepath.Join(p.ResolvedPath(), ".beads", "issues.jsonl")
 			silentOpts := loader.ParseOptions{WarningHandler: func(string) {}}
 			if issues, err := loader.LoadIssuesFromFileWithOptions(beadsPath, silentOpts); err == nil {
-				// Build issue map for dependency resolution
-				issMap := make(map[string]model.Issue, len(issues))
-				for _, iss := range issues {
-					issMap[iss.ID] = iss
-				}
-				for _, iss := range issues {
-					if isClosedLikeStatus(iss.Status) {
-						continue
-					}
-					// Count open vs in_progress separately (bd-o23v)
-					switch {
-					case iss.Status == "in_progress":
-						entry.InProgressCount++
-					case iss.Status == model.StatusBlocked:
-						entry.BlockedCount++
-						continue // blocked issues can't be ready
-					default:
-						entry.OpenCount++
-					}
-					// Check if blocked by open dependencies
-					isBlocked := false
-					for _, dep := range iss.Dependencies {
-						if dep == nil || !dep.Type.IsBlocking() {
-							continue
-						}
-						if blocker, exists := issMap[dep.DependsOnID]; exists && !isClosedLikeStatus(blocker.Status) {
-							isBlocked = true
-							break
-						}
-					}
-					if !isBlocked {
-						entry.ReadyCount++
-					}
-				}
+				counts := summarizeProjectIssues(issues)
+				entry.OpenCount = counts.open
+				entry.InProgressCount = counts.inProgress
+				entry.ReadyCount = counts.ready
+				entry.BlockedCount = counts.blocked
 			}
 		}
 		entries = append(entries, entry)
@@ -682,6 +700,42 @@ func (m Model) buildProjectEntries() []ProjectEntry {
 	}
 
 	return entries
+}
+
+func summarizeProjectIssues(issues []model.Issue) projectCounts {
+	counts := projectCounts{}
+	issueMap := make(map[string]model.Issue, len(issues))
+	for _, issue := range issues {
+		issueMap[issue.ID] = issue
+	}
+	for _, issue := range issues {
+		if isClosedLikeStatus(issue.Status) {
+			continue
+		}
+		switch {
+		case issue.Status == model.StatusInProgress:
+			counts.inProgress++
+		case issue.Status == model.StatusBlocked:
+			counts.blocked++
+			continue
+		default:
+			counts.open++
+		}
+		isBlocked := false
+		for _, dep := range issue.Dependencies {
+			if dep == nil || !dep.Type.IsBlocking() {
+				continue
+			}
+			if blocker, exists := issueMap[dep.DependsOnID]; exists && !isClosedLikeStatus(blocker.Status) {
+				isBlocked = true
+				break
+			}
+		}
+		if !isBlocked {
+			counts.ready++
+		}
+	}
+	return counts
 }
 
 // filterIssuesByLabel returns issues that contain the given label (case-sensitive match)
@@ -1022,9 +1076,9 @@ func (m Model) Init() tea.Cmd {
 	} else if m.watcher != nil {
 		cmds = append(cmds, WatchFileCmd(m.watcher))
 	}
-	// Start periodic picker refresh for non-active project counts (bd-8yc)
+	// Load picker counts outside the update loop, then schedule periodic refreshes.
 	if len(m.allProjects) > 1 {
-		cmds = append(cmds, pickerRefreshTickCmd())
+		cmds = append(cmds, loadProjectCountsCmd(m.allProjects))
 	}
 	return tea.Batch(cmds...)
 }
@@ -1196,11 +1250,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case PickerRefreshTickMsg:
 		// Periodic refresh of project picker counts (bd-8yc)
 		if len(m.allProjects) > 0 {
-			entries := m.buildProjectEntries()
-			m.projectPicker = NewProjectPicker(entries, m.theme)
-			m.projectPicker.SetSourceInfo(m.sourceInfo)
-			m.projectPicker.SetSize(m.width, m.height)
+			return m, loadProjectCountsCmd(m.allProjects)
 		}
+		return m, nil
+
+	case projectCountsLoadedMsg:
+		if m.projectCountCache == nil {
+			m.projectCountCache = make(map[string]projectCounts, len(msg.counts))
+		}
+		for path, counts := range msg.counts {
+			m.projectCountCache[path] = counts
+		}
+		entries := m.buildProjectEntries()
+		m.projectPicker = NewProjectPicker(entries, m.theme)
+		m.projectPicker.SetSourceInfo(m.sourceInfo)
+		m.projectPicker.SetSize(m.width, m.height)
 		return m, pickerRefreshTickCmd()
 
 	case workerPollTickMsg:
