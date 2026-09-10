@@ -77,6 +77,8 @@ Press `?` for keyboard shortcuts or `` ` `` (backtick) for the interactive tutor
 
 B9s discovers and reads from multiple data backends automatically. On startup, it scans the `.beads/` directory for all available sources and selects the most authoritative one based on a fixed priority order.
 
+Project auto-discovery accepts any supported backend. A server-mode project only needs valid Dolt configuration in `.beads/metadata.json` to appear in the project picker; it does not need a JSONL export. Discovery does not connect to Dolt, so configured projects remain visible when the server or tunnel is temporarily unavailable.
+
 ### Source Priority
 
 When multiple backends are present, B9s picks the highest-priority source:

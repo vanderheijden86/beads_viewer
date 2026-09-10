@@ -155,6 +155,39 @@ func TestDiscoverProjects_AddsNewProjects(t *testing.T) {
 	}
 }
 
+func TestDiscoverProjects_AddsDoltOnlyProject(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "dolt-project")
+	beadsDir := filepath.Join(project, ".beads")
+	if err := os.MkdirAll(beadsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	metadata := `{
+		"dolt_mode": "server",
+		"dolt_server_host": "127.0.0.1",
+		"dolt_server_port": 3306,
+		"dolt_server_user": "bd_test",
+		"dolt_database": "test_project"
+	}`
+	if err := os.WriteFile(filepath.Join(beadsDir, "metadata.json"), []byte(metadata), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{Discovery: DiscoveryConfig{
+		ScanPaths: []string{root},
+		MaxDepth:  2,
+	}}
+
+	projects, discoveryErrors := DiscoverProjectsWithErrors(cfg)
+
+	if len(projects) != 1 || projects[0].Path != project {
+		t.Fatalf("expected Dolt-only project %q, got %#v", project, projects)
+	}
+	if len(discoveryErrors) != 0 {
+		t.Fatalf("expected no discovery errors, got %v", discoveryErrors)
+	}
+}
+
 func TestFindBeadsRoot(t *testing.T) {
 	root := t.TempDir()
 

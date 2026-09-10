@@ -80,6 +80,8 @@ type DiscoveryOptions struct {
 	ValidateAfterDiscovery bool
 	// IncludeInvalid includes sources that failed validation in results
 	IncludeInvalid bool
+	// SkipWorktreeSources restricts discovery to sources in BeadsDir.
+	SkipWorktreeSources bool
 	// Verbose enables detailed logging during discovery
 	Verbose bool
 	// Logger receives log messages when Verbose is true
@@ -140,11 +142,13 @@ func DiscoverSources(opts DiscoveryOptions) ([]DataSource, error) {
 	sources = append(sources, localSources...)
 
 	// Discover worktree JSONL files
-	worktreeSources, err := discoverWorktreeSources(opts.RepoPath, opts)
-	if err != nil && opts.Verbose {
-		opts.Logger(fmt.Sprintf("Worktree discovery warning: %v", err))
+	if !opts.SkipWorktreeSources {
+		worktreeSources, err := discoverWorktreeSources(opts.RepoPath, opts)
+		if err != nil && opts.Verbose {
+			opts.Logger(fmt.Sprintf("Worktree discovery warning: %v", err))
+		}
+		sources = append(sources, worktreeSources...)
 	}
-	sources = append(sources, worktreeSources...)
 
 	// Validate sources if requested
 	if opts.ValidateAfterDiscovery {
@@ -184,13 +188,13 @@ func DiscoverSources(opts DiscoveryOptions) ([]DataSource, error) {
 // beadsMetadata mirrors the fields b9s reads from .beads/metadata.json.
 // This is the same file bd writes, so b9s and bd always agree on connection details.
 type beadsMetadata struct {
-	DoltMode       string `json:"dolt_mode"`            // "embedded" or "server"
-	DoltServerHost string `json:"dolt_server_host"`     // default: 127.0.0.1
-	DoltServerPort int    `json:"dolt_server_port"`     // default: 3307
-	DoltServerUser string `json:"dolt_server_user"`     // default: root
-	DoltDatabase   string `json:"dolt_database"`        // default: beads
-	Database       string `json:"database"`             // legacy: "dolt" or "beads.db"
-	IssuePrefix    string `json:"issue_prefix"`         // e.g. "bd"
+	DoltMode       string `json:"dolt_mode"`        // "embedded" or "server"
+	DoltServerHost string `json:"dolt_server_host"` // default: 127.0.0.1
+	DoltServerPort int    `json:"dolt_server_port"` // default: 3307
+	DoltServerUser string `json:"dolt_server_user"` // default: root
+	DoltDatabase   string `json:"dolt_database"`    // default: beads
+	Database       string `json:"database"`         // legacy: "dolt" or "beads.db"
+	IssuePrefix    string `json:"issue_prefix"`     // e.g. "bd"
 }
 
 // discoverDoltSources detects a Dolt server backend by reading .beads/metadata.json.

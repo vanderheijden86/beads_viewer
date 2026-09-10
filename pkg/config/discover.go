@@ -1,12 +1,12 @@
 package config
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/vanderheijden86/beadwork/internal/datasource"
 )
 
 // DiscoverProjects scans directories for .beads/ subdirectories and returns
@@ -130,46 +130,33 @@ func findBeadsRoot(dir string) (string, bool) {
 	return "", false
 }
 
-// validateBeadsDir checks that a project directory has a valid .beads/issues.jsonl file.
-// Returns nil if valid, an error describing the problem otherwise.
+// validateBeadsDir checks that a project directory exposes a usable beads data source.
+// Server-backed Dolt sources are accepted from metadata without requiring the server
+// to be reachable while the project picker starts.
 func validateBeadsDir(projectPath string) error {
 	beadsDir := filepath.Join(projectPath, ".beads")
-
-	// Look for a JSONL file (issues.jsonl is the standard name)
-	candidates := []string{"issues.jsonl", "beads.jsonl"}
-	var jsonlPath string
-	for _, name := range candidates {
-		p := filepath.Join(beadsDir, name)
-		if info, err := os.Stat(p); err == nil && !info.IsDir() && info.Size() > 0 {
-			jsonlPath = p
-			break
-		}
-	}
-	if jsonlPath == "" {
-		return fmt.Errorf("no issues.jsonl found in .beads/")
-	}
-
-	// Validate that the file contains at least one parseable JSON line with an "id" field
-	f, err := os.Open(jsonlPath)
+	sources, err := datasource.DiscoverSources(datasource.DiscoveryOptions{
+		BeadsDir:            beadsDir,
+		RepoPath:            projectPath,
+		SkipWorktreeSources: true,
+	})
 	if err != nil {
-		return fmt.Errorf("cannot read %s: %w", filepath.Base(jsonlPath), err)
+		return fmt.Errorf("discover data sources: %w", err)
 	}
-	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
+	var validationErrors []string
+	for i := range sources {
+		if sources[i].Type == datasource.SourceTypeDolt {
+			return nil
 		}
-		var obj map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(line), &obj); err != nil {
-			return fmt.Errorf("malformed JSON in %s: %w", filepath.Base(jsonlPath), err)
+		if err := datasource.ValidateSource(&sources[i]); err == nil {
+			return nil
+		} else {
+			validationErrors = append(validationErrors, fmt.Sprintf("%s: %v", sources[i].Type, err))
 		}
-		if _, ok := obj["id"]; !ok {
-			return fmt.Errorf("first entry in %s has no 'id' field", filepath.Base(jsonlPath))
-		}
-		return nil // First valid line is enough
 	}
-	return fmt.Errorf("%s has no valid entries", filepath.Base(jsonlPath))
+	if len(validationErrors) > 0 {
+		return fmt.Errorf("no usable data source found in .beads/: %s", strings.Join(validationErrors, "; "))
+	}
+	return fmt.Errorf("no usable data source found in .beads/")
 }
