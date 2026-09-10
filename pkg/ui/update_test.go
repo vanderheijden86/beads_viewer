@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,6 +17,97 @@ type badItem struct{}
 func (badItem) Title() string       { return "bad" }
 func (badItem) Description() string { return "bad" }
 func (badItem) FilterValue() string { return "bad" }
+
+func followModeIssues(includeNewChild bool) []model.Issue {
+	now := time.Unix(1_700_000_000, 0)
+	issues := []model.Issue{
+		{ID: "epic", Title: "Epic", Status: model.StatusOpen, IssueType: model.TypeEpic, CreatedAt: now},
+		{
+			ID: "nested-epic", Title: "Nested epic", Status: model.StatusOpen, IssueType: model.TypeEpic,
+			CreatedAt: now.Add(time.Minute),
+			Dependencies: []*model.Dependency{
+				{IssueID: "nested-epic", DependsOnID: "epic", Type: model.DepParentChild},
+			},
+		},
+	}
+	if includeNewChild {
+		issues = append(issues, model.Issue{
+			ID: "nested-bug", Title: "Nested bug", Status: model.StatusClosed, IssueType: model.TypeBug,
+			CreatedAt: now.Add(2 * time.Minute),
+			Dependencies: []*model.Dependency{
+				{IssueID: "nested-bug", DependsOnID: "nested-epic", Type: model.DepParentChild},
+			},
+		})
+	}
+	return issues
+}
+
+func TestSnapshotReadyMsgFollowRevealsNewNestedIssue(t *testing.T) {
+	m := NewModel(followModeIssues(false), "")
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("F")})
+	m = updated.(Model)
+
+	snapshot := NewSnapshotBuilder(followModeIssues(true)).Build()
+	updated, _ = m.Update(SnapshotReadyMsg{Snapshot: snapshot})
+	m = updated.(Model)
+
+	if got := m.tree.GetSelectedID(); got != "nested-bug" {
+		t.Fatalf("follow mode selected %q after snapshot reload, want nested-bug", got)
+	}
+	if got := m.tree.NodeCount(); got != 3 {
+		t.Fatalf("follow mode left the nested parent collapsed: visible nodes = %d, want 3", got)
+	}
+}
+
+func TestSnapshotReadyMsgFollowOffPreservesCollapsedSelection(t *testing.T) {
+	m := NewModel(followModeIssues(false), "")
+	if !m.tree.SelectByID("nested-epic") {
+		t.Fatal("select nested-epic")
+	}
+
+	snapshot := NewSnapshotBuilder(followModeIssues(true)).Build()
+	updated, _ := m.Update(SnapshotReadyMsg{Snapshot: snapshot})
+	m = updated.(Model)
+
+	if got := m.tree.GetSelectedID(); got != "nested-epic" {
+		t.Fatalf("follow-off reload moved selection to %q, want nested-epic", got)
+	}
+	if got := m.tree.NodeCount(); got != 2 {
+		t.Fatalf("follow-off reload expanded the nested parent: visible nodes = %d, want 2", got)
+	}
+}
+
+func TestFileChangedMsgFollowRevealsNewNestedIssue(t *testing.T) {
+	tmp := t.TempDir()
+	beads := filepath.Join(tmp, "beads.jsonl")
+	initial := "" +
+		`{"id":"epic","title":"Epic","status":"open","issue_type":"epic","created_at":"2023-11-14T22:13:20Z"}` + "\n" +
+		`{"id":"nested-epic","title":"Nested epic","status":"open","issue_type":"epic","created_at":"2023-11-14T22:14:20Z","dependencies":[{"issue_id":"nested-epic","depends_on_id":"epic","type":"parent-child"}]}` + "\n"
+	if err := os.WriteFile(beads, []byte(initial), 0o644); err != nil {
+		t.Fatalf("write initial beads: %v", err)
+	}
+
+	m := NewModel(followModeIssues(false), beads)
+	if m.watcher != nil {
+		defer m.watcher.Stop()
+	}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("F")})
+	m = updated.(Model)
+
+	withChild := initial + `{"id":"nested-bug","title":"Nested bug","status":"closed","issue_type":"bug","created_at":"2023-11-14T22:15:20Z","dependencies":[{"issue_id":"nested-bug","depends_on_id":"nested-epic","type":"parent-child"}]}` + "\n"
+	if err := os.WriteFile(beads, []byte(withChild), 0o644); err != nil {
+		t.Fatalf("write updated beads: %v", err)
+	}
+
+	updated, _ = m.Update(FileChangedMsg{})
+	m = updated.(Model)
+	if got := m.tree.GetSelectedID(); got != "nested-bug" {
+		t.Fatalf("follow mode selected %q after file reload, want nested-bug", got)
+	}
+	if got := m.tree.NodeCount(); got != 3 {
+		t.Fatalf("follow mode left the nested parent collapsed: visible nodes = %d, want 3", got)
+	}
+}
 
 func TestCopyIssueToClipboardInvalidItem(t *testing.T) {
 	m := NewModel(nil, "")
