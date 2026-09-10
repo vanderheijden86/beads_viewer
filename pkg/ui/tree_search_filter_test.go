@@ -88,8 +88,8 @@ func TestTreeSearchTypingKeepsLabelFilter(t *testing.T) {
 	if got := m.tree.GetLabelFilter(); got != "bug" {
 		t.Errorf("tree label filter = %q, want %q (filter dropped by search)", got, "bug")
 	}
-	if got := m.tree.NodeCount(); got != 2 {
-		t.Errorf("visible tree nodes = %d (%v), want 2 label-filtered nodes", got, treeVisibleIDs(&m.tree))
+	if got := m.tree.NodeCount(); got != 1 {
+		t.Errorf("visible tree nodes = %d (%v), want the 1 node matching both label and query", got, treeVisibleIDs(&m.tree))
 	}
 }
 

@@ -700,6 +700,13 @@ func (b *BoardModel) FinishSearch() {
 	b.searchMode = false
 }
 
+// SetIssueQuery applies the shared query after the board's filtered issue set changes.
+func (b *BoardModel) SetIssueQuery(query IssueQuery) {
+	b.searchMode = false
+	b.searchQuery = query.Raw()
+	b.updateSearchMatches()
+}
+
 // SearchQuery returns the current search query
 func (b *BoardModel) SearchQuery() string { return b.searchQuery }
 
@@ -787,7 +794,7 @@ func (b *BoardModel) PrevMatch() {
 
 // IsMatchHighlighted returns true if position is current search match
 func (b *BoardModel) IsMatchHighlighted(colIdx, rowIdx int) bool {
-	if !b.searchMode || len(b.searchMatches) == 0 {
+	if b.searchQuery == "" || len(b.searchMatches) == 0 {
 		return false
 	}
 	match := b.searchMatches[b.searchCursor]
@@ -796,7 +803,7 @@ func (b *BoardModel) IsMatchHighlighted(colIdx, rowIdx int) bool {
 
 // IsSearchMatch returns true if position matches the search query
 func (b *BoardModel) IsSearchMatch(colIdx, rowIdx int) bool {
-	if !b.searchMode || b.searchQuery == "" {
+	if b.searchQuery == "" {
 		return false
 	}
 	for _, m := range b.searchMatches {

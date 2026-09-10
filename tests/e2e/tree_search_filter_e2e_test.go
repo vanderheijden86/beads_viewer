@@ -33,8 +33,7 @@ func makeLabelSearchFixture(t *testing.T) []treeFixtureIssue {
 //
 // Before the fix the "a" keystroke fired the global "clear all filters"
 // shortcut, so the query came out as "lpha" and the label filter was gone.
-// After the fix the search bar shows "/alpha" and the match count is scoped to
-// the filtered set (only the "bug"-labelled Alpha issue matches).
+// The shared query bar shows the full query, label chip, and one live result.
 func TestTreeSearchKeepsLabelFilterE2E(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTreeFixture(t, tempDir, makeLabelSearchFixture(t))
@@ -54,10 +53,13 @@ func TestTreeSearchKeepsLabelFilterE2E(t *testing.T) {
 	}
 
 	s := string(out)
-	if !strings.Contains(s, "/alpha") {
-		t.Errorf("search bar never showed the full query %q — keys leaked to global shortcuts\noutput:\n%s", "/alpha", s)
+	if !strings.Contains(s, "WHERE / FILTER") || !strings.Contains(s, "/ alpha") {
+		t.Errorf("shared query bar never showed the full query %q\noutput:\n%s", "alpha", s)
 	}
-	if !strings.Contains(s, "/alpha [1/1]") {
-		t.Errorf("expected the query to match exactly the 1 label-filtered issue (\"/alpha [1/1]\")\noutput:\n%s", s)
+	if !strings.Contains(s, "[label:bug]") || !strings.Contains(s, "1/5") {
+		t.Errorf("expected the bar to show the active label and one result out of five\noutput:\n%s", s)
+	}
+	if !strings.Contains(s, "ORDER BY") {
+		t.Errorf("expected the query bar to show the active ordering\noutput:\n%s", s)
 	}
 }

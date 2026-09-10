@@ -2000,6 +2000,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 
+		// The shared query bar owns keyboard input in every view. Keeping this
+		// before global shortcuts prevents query characters from activating UI
+		// commands and gives accepted queries one consistent Escape behavior.
+		if m.queryState.Mode() == QueryEditing {
+			if msg.String() == "ctrl+c" {
+				return m, tea.Quit
+			}
+			m = m.handleQueryKey(msg)
+			return m, tea.Batch(cmds...)
+		}
+		if msg.String() == "esc" && !m.queryState.Empty() {
+			m.queryState.Clear()
+			m.setQueryText("")
+			return m, tea.Batch(cmds...)
+		}
+
 		// Handle help overlay toggle (? or F1)
 		if (msg.String() == "?" || msg.String() == "f1") && m.list.FilterState() != list.Filtering {
 			m.showHelp = !m.showHelp
@@ -2754,7 +2770,7 @@ func (m Model) handleBoardKeys(msg tea.KeyMsg) Model {
 
 	// Search (bv-yg39)
 	case "/":
-		m.board.StartSearch()
+		m.queryState.StartEditing()
 
 	// Search navigation when not in search mode (bv-yg39)
 	case "n":
@@ -2970,8 +2986,7 @@ func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
 		// Open sort popup menu (bd-u81)
 		m.tree.OpenSortPopup()
 	case "/":
-		// Enter search mode (bd-wf8)
-		m.tree.EnterSearchMode()
+		m.queryState.StartEditing()
 	case "n":
 		// Next search match (bd-wf8)
 		m.tree.NextSearchMatch()
@@ -2986,19 +3001,27 @@ func (m Model) handleTreeKeys(msg tea.KeyMsg) Model {
 		m.syncTreeToDetail()
 	case "o":
 		// Filter: open issues (bd-5nw)
-		m.tree.ApplyFilter("open")
+		m.currentFilter = "open"
+		m.applyFilter()
+		m.tree.ApplyFilter(m.currentFilter)
 		m.syncTreeToDetail()
 	case "c":
 		// Filter: closed issues (bd-5nw)
-		m.tree.ApplyFilter("closed")
+		m.currentFilter = "closed"
+		m.applyFilter()
+		m.tree.ApplyFilter(m.currentFilter)
 		m.syncTreeToDetail()
 	case "r":
 		// Filter: ready issues (bd-5nw)
-		m.tree.ApplyFilter("ready")
+		m.currentFilter = "ready"
+		m.applyFilter()
+		m.tree.ApplyFilter(m.currentFilter)
 		m.syncTreeToDetail()
 	case "a":
 		// Filter: all issues (bd-5nw)
-		m.tree.ApplyFilter("all")
+		m.currentFilter = "all"
+		m.applyFilter()
+		m.tree.ApplyFilter(m.currentFilter)
 		m.syncTreeToDetail()
 	case "p":
 		// Jump to parent node (bd-ryu) — 'P' is now picker toggle (bd-ey3)
@@ -3146,6 +3169,9 @@ func (m Model) handleLabelPickerKeys(msg tea.KeyMsg) Model {
 // and should NOT be forwarded to the bubbles/list component (bd-kob).
 func (m Model) handleListKeys(msg tea.KeyMsg) (Model, bool) {
 	switch msg.String() {
+	case "/":
+		m.queryState.StartEditing()
+		return m, true
 	case "enter":
 		if !m.isSplitView {
 			m.showDetails = true
@@ -4471,8 +4497,105 @@ func (m *Model) matchesCurrentFilter(issue model.Issue) bool {
 // setQueryText is the single write path for the cross-view issue query.
 func (m *Model) setQueryText(text string) {
 	m.queryState.SetText(text)
-	m.tree.SetIssueQuery(m.queryState.Query())
 	m.applyFilter()
+	m.tree.SetIssueQuery(m.queryState.Query())
+	m.syncTreeToDetail()
+}
+
+func (m Model) handleQueryKey(msg tea.KeyMsg) Model {
+	switch msg.String() {
+	case "esc":
+		m.queryState.Clear()
+		m.setQueryText("")
+	case "enter":
+		m.queryState.Accept()
+	case "backspace":
+		m.queryState.Backspace()
+		m.setQueryText(m.queryState.Text())
+	case "tab":
+		m.completeQuery()
+	default:
+		if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
+			m.queryState.Append(msg.Runes...)
+			m.setQueryText(m.queryState.Text())
+		}
+	}
+	return m
+}
+
+func (m *Model) completeQuery() {
+	candidates := m.queryCompletions()
+	if len(candidates) > 0 {
+		m.setQueryText(candidates[0])
+	}
+}
+
+func (m Model) queryCompletions() []string {
+	text := m.queryState.Text()
+	tokenStart := strings.LastIndexAny(text, " \t") + 1
+	prefix := text[:tokenStart]
+	token := text[tokenStart:]
+	negation := ""
+	lookupToken := token
+	if strings.HasPrefix(lookupToken, "!") {
+		negation = "!"
+		lookupToken = strings.TrimPrefix(lookupToken, "!")
+	}
+
+	if !strings.Contains(lookupToken, ":") {
+		fields := []string{"assignee:", "id:", "label:", "priority:", "project:", "status:", "title:", "type:"}
+		matches := make([]string, 0, len(fields))
+		for _, field := range fields {
+			if strings.HasPrefix(field, strings.ToLower(lookupToken)) {
+				matches = append(matches, prefix+negation+field)
+			}
+		}
+		return matches
+	}
+
+	parts := strings.SplitN(lookupToken, ":", 2)
+	field, valuePrefix := QueryField(strings.ToLower(parts[0])), strings.ToLower(parts[1])
+	values := make(map[string]struct{})
+	add := func(value string) {
+		if value != "" && strings.HasPrefix(strings.ToLower(value), valuePrefix) {
+			values[value] = struct{}{}
+		}
+	}
+	for _, issue := range m.issues {
+		switch field {
+		case QueryFieldID:
+			add(issue.ID)
+		case QueryFieldStatus:
+			add(string(issue.Status))
+		case QueryFieldPriority:
+			add(fmt.Sprintf("%d", issue.Priority))
+		case QueryFieldType:
+			add(string(issue.IssueType))
+		case QueryFieldLabel:
+			for _, label := range issue.Labels {
+				add(label)
+			}
+		case QueryFieldAssignee:
+			add(issue.Assignee)
+		case QueryFieldProject:
+			project := issue.SourceRepo
+			if project == "" {
+				project = ExtractRepoPrefix(issue.ID)
+			}
+			add(project)
+		}
+	}
+
+	sortedValues := make([]string, 0, len(values))
+	for value := range values {
+		sortedValues = append(sortedValues, value)
+	}
+	sort.Strings(sortedValues)
+	completions := make([]string, 0, len(sortedValues))
+	for _, value := range sortedValues {
+		completions = append(completions, prefix+negation+string(field)+":"+value)
+	}
+	return completions
 }
 
 func (m *Model) filteredIssuesForActiveView() []model.Issue {
@@ -4501,6 +4624,7 @@ func (m *Model) refreshBoardAndGraphForCurrentFilter() {
 	} else {
 		m.board.SetIssues(filteredIssues)
 	}
+	m.board.SetIssueQuery(m.queryState.Query())
 }
 
 func (m *Model) applyFilter() {
@@ -4528,6 +4652,7 @@ func (m *Model) applyFilter() {
 	} else {
 		m.board.SetIssues(filteredIssues)
 	}
+	m.board.SetIssueQuery(m.queryState.Query())
 
 	// Keep selection in bounds
 	if len(filteredItems) > 0 && m.list.Index() >= len(filteredItems) {
@@ -4980,9 +5105,9 @@ func (m Model) TreeDetailHidden() bool {
 	return m.treeDetailHidden
 }
 
-// TreeIsSearchMode returns whether the tree search bar is active (bd-c55q).
+// TreeIsSearchMode returns whether query input is active while viewing the tree.
 func (m Model) TreeIsSearchMode() bool {
-	return m.tree.IsSearchMode()
+	return m.tree.IsSearchMode() || (m.focused == focusTree && m.queryState.Mode() == QueryEditing)
 }
 
 // isTreeSearchActive reports whether the tree's free-text search bar is open and
@@ -6036,90 +6161,60 @@ func (m Model) renderLabelBar() string {
 	return strings.Join(rows, "\n")
 }
 
-// renderUnifiedTitleBar renders a title bar showing all active filters (project, label, assignee)
-// regardless of which picker mode is active. The current mode is highlighted (bd-j764).
+// renderUnifiedTitleBar renders the persistent query, filter, result, and sort summary.
 func (m Model) renderUnifiedTitleBar(w int) string {
 	t := m.theme
+	labelStyle := t.Renderer.NewStyle().Foreground(t.Primary).Bold(true)
+	queryStyle := t.Renderer.NewStyle().Foreground(lipgloss.Color("#F3F3F3")).Bold(true)
+	secondaryStyle := t.Renderer.NewStyle().Foreground(t.Secondary)
 
-	activeStyle := t.Renderer.NewStyle().
-		Foreground(t.Primary).
-		Bold(true)
-	dimStyle := t.Renderer.NewStyle().
-		Foreground(t.Secondary)
-	filterStyle := t.Renderer.NewStyle().
-		Foreground(lipgloss.Color("#F3F3F3")).
-		Bold(true)
-	hintStyle := t.Renderer.NewStyle().
-		Foreground(t.Secondary)
-
-	// Build filter segments: P:<project>  L:<label>  A:<assignee>
-	var segments []string
-
-	// Project segment
-	projectName := m.activeProjectName
-	if m.allProjectsMode {
-		projectName = "All"
+	queryText := m.queryState.Text()
+	if queryText == "" {
+		queryText = "search ID, title, or field:value"
 	}
-	if m.pickerMode == pickerModeProjects {
-		segments = append(segments, activeStyle.Render("P:")+filterStyle.Render(projectName))
-	} else {
-		segments = append(segments, dimStyle.Render("P:")+dimStyle.Render(projectName))
+	if m.queryState.Mode() == QueryEditing {
+		queryText += "█"
 	}
 
-	// Label segment
-	labelName := "all"
+	leftParts := []string{"WHERE / FILTER", "/ " + queryText}
+	if m.currentFilter != "" && m.currentFilter != "all" {
+		leftParts = append(leftParts, "[status:"+m.currentFilter+"]")
+	}
 	if m.labelFilter != "" {
-		labelName = m.labelFilter
+		leftParts = append(leftParts, "[label:"+m.labelFilter+"]")
 	}
-	if m.pickerMode == pickerModeLabels {
-		if m.labelFilter != "" {
-			segments = append(segments, activeStyle.Render("L:")+filterStyle.Render(labelName))
-		} else {
-			segments = append(segments, activeStyle.Render("L:")+activeStyle.Render(labelName))
-		}
-	} else if m.labelFilter != "" {
-		segments = append(segments, dimStyle.Render("L:")+filterStyle.Render(labelName))
-	} else {
-		segments = append(segments, dimStyle.Render("L:")+dimStyle.Render(labelName))
-	}
-
-	// Assignee segment
-	assigneeName := "all"
 	if m.assigneeFilter != "" {
-		assigneeName = m.assigneeFilter
+		leftParts = append(leftParts, "[assignee:"+m.assigneeFilter+"]")
 	}
-	if m.pickerMode == pickerModeAssignees {
-		if m.assigneeFilter != "" {
-			segments = append(segments, activeStyle.Render("A:")+filterStyle.Render(assigneeName))
-		} else {
-			segments = append(segments, activeStyle.Render("A:")+activeStyle.Render(assigneeName))
+	if m.allProjectsMode {
+		leftParts = append(leftParts, "[project:all]")
+	} else if m.activeProjectName != "" {
+		leftParts = append(leftParts, "[project:"+m.activeProjectName+"]")
+	}
+	leftParts = append(leftParts, fmt.Sprintf("%d/%d", len(m.list.Items()), len(m.issues)))
+
+	if m.queryState.Mode() == QueryEditing {
+		if candidates := m.queryCompletions(); len(candidates) > 0 && candidates[0] != m.queryState.Text() {
+			leftParts = append(leftParts, "⇥ "+candidates[0])
 		}
-	} else if m.assigneeFilter != "" {
-		segments = append(segments, dimStyle.Render("A:")+filterStyle.Render(assigneeName))
-	} else {
-		segments = append(segments, dimStyle.Render("A:")+dimStyle.Render(assigneeName))
 	}
 
-	title := strings.Join(segments, "  ")
-
-	// Hints
-	hintText := " H:hide  a:clear  []:scroll"
-	hint := hintStyle.Render(hintText)
-
-	sepChar := "\u2500"
-	sepStyle := t.Renderer.NewStyle().Foreground(t.Border)
-
-	titleLen := lipgloss.Width(title) + lipgloss.Width(hint)
-	leftPad := (w - titleLen - 4) / 2
-	rightPad := w - titleLen - 4 - leftPad
-	if leftPad < 1 {
-		leftPad = 1
+	right := fmt.Sprintf("ORDER BY  %s %s", m.tree.GetSortField().String(), m.tree.GetSortDirection().Indicator())
+	availableLeft := w - lipgloss.Width(right) - 3
+	if availableLeft < 12 {
+		availableLeft = 12
 	}
-	if rightPad < 1 {
-		rightPad = 1
+	left := truncateRunesHelper(strings.Join(leftParts, "  "), availableLeft, "…")
+	padding := w - lipgloss.Width(left) - lipgloss.Width(right)
+	if padding < 1 {
+		padding = 1
 	}
 
-	return sepStyle.Render(strings.Repeat(sepChar, leftPad)) + " " + title + hint + " " + sepStyle.Render(strings.Repeat(sepChar, rightPad))
+	styledLeft := queryStyle.Render(left)
+	if strings.HasPrefix(left, "WHERE / FILTER") {
+		styledLeft = labelStyle.Render("WHERE / FILTER") + queryStyle.Render(strings.TrimPrefix(left, "WHERE / FILTER"))
+	}
+	return styledLeft + strings.Repeat(" ", padding) + secondaryStyle.Render(right)
 }
 
 // renderAssigneeBar renders the top bar in assignee mode, showing assignees with counts

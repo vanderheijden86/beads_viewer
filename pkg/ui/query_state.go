@@ -193,6 +193,18 @@ func (s *QueryState) SetText(text string) {
 	s.query = ParseIssueQuery(text)
 }
 
+func (s *QueryState) Append(runes ...rune) {
+	s.SetText(s.text + string(runes))
+}
+
+func (s *QueryState) Backspace() {
+	runes := []rune(s.text)
+	if len(runes) == 0 {
+		return
+	}
+	s.SetText(string(runes[:len(runes)-1]))
+}
+
 func (s QueryState) Mode() QueryMode {
 	return s.mode
 }

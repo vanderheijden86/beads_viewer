@@ -268,6 +268,7 @@ type TreeModel struct {
 	// Search state (bd-uus)
 	searchMode       bool             // Is search input active?
 	searchQuery      string           // Current search query
+	sharedQuery      bool             // Query input is rendered by the root title bar
 	searchMatches    []*IssueTreeNode // Nodes matching search
 	searchMatchIndex int              // Current match index for n/N cycling
 	searchMatchIDs   map[string]bool  // Quick lookup for highlighting
@@ -955,7 +956,14 @@ func (t *TreeModel) SetAssigneeFilter(assignee string) {
 // SetIssueQuery applies the shared cross-view query to the tree.
 func (t *TreeModel) SetIssueQuery(query IssueQuery) {
 	t.issueQuery = query
+	t.sharedQuery = true
+	t.searchMode = false
+	t.searchQuery = query.Raw()
 	t.ApplyFilter(t.currentFilter)
+	if len(t.searchMatches) > 0 {
+		t.SelectByID(t.searchMatches[0].Issue.ID)
+		t.revealCursorWithContext()
+	}
 }
 
 // ApplyFilter sets the current filter and rebuilds the visible flat list (bd-e3w).
@@ -1170,7 +1178,7 @@ func (t *TreeModel) View() string {
 
 	// Keep accepted queries visible so highlighted matches and n/N navigation
 	// always have an on-screen explanation.
-	if t.searchMode || t.searchQuery != "" {
+	if (t.searchMode || t.searchQuery != "") && !t.sharedQuery {
 		sb.WriteString("\n")
 		sb.WriteString(t.renderSearchBar())
 	}
@@ -2362,7 +2370,7 @@ func (t *TreeModel) effectiveVisibleCount() int {
 	if visibleCount <= 0 {
 		visibleCount = 19 // Default: 20 minus 1 for header
 	}
-	if t.searchMode || t.searchQuery != "" {
+	if (t.searchMode || t.searchQuery != "") && !t.sharedQuery {
 		visibleCount--
 	}
 	// Reserve 1 more line for the position indicator when scrolling is needed
@@ -2481,6 +2489,7 @@ func (t *TreeModel) buildFlatNodes() []*IssueTreeNode {
 
 // EnterSearchMode activates the search input bar.
 func (t *TreeModel) EnterSearchMode() {
+	t.sharedQuery = false
 	t.searchMode = true
 	t.searchQuery = ""
 	t.searchMatches = nil

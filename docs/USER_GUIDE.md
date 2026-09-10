@@ -35,7 +35,7 @@ No web page loads, no heavy clients. `bw` starts instantly and lets you fly thro
 Don't just read the title. `bw` gives you the full picture:
 *   **Comments & History:** Scroll through the full conversation history of any task.
 *   **Metadata:** Instantly see Assignees, Labels, Priority badges, and creation dates.
-*   **Search:** Powerful fuzzy search (`/`) finds issues by ID, title, or content instantly.
+*   **Search:** A shared query bar (`/`) finds issues by ID or title and composes structured fields such as status, type, priority, label, assignee, and project.
 
 ### 🎯 Focused Workflows
 *   **Kanban Board:** Press `b` to switch to a columnar view (Open, In Progress, Blocked, Closed) to visualize flow.
@@ -2534,8 +2534,8 @@ bw has a comprehensive built-in help system:
 | | `r` | Show **Ready** (Unblocked) |
 | | `c` | Show **Closed** Issues |
 | | `a` | Show **All** Issues |
-| | `/` | **Search** (Fuzzy) |
-| | `Ctrl+S` | Toggle **Search Mode** (Semantic ↔ Fuzzy) |
+| | `/` | Focus the shared **WHERE / FILTER** query bar |
+| | `Tab` | Complete the current query field or value |
 | | `l` | **Label Picker** (quick filter by label) |
 | **List Sorting** | `s` | Cycle Sort Mode (Default → Created ↑ → Created ↓ → Priority → Updated) |
 | **Views** | `b` | Toggle **Kanban Board** |
@@ -2576,12 +2576,31 @@ bw has a comprehensive built-in help system:
 
 ### Search and filters compose
 
-Free-text search (`/`) narrows what the active filters already show; it never replaces them.
+Press `/` in the tree, list, or board to focus one shared **WHERE / FILTER** bar. Results update as you type, and the bar always shows the result count, active quick-filter chips, and current sort:
 
-- **While the search bar is open, every keystroke goes into the query.** Global shortcuts are suspended until you leave search, so typing a query containing `a` (clear filters), a digit (label/project selection), `?`, `H`, `P` or `D` no longer triggers those actions. Leave search with `Esc` (cancel the query) or `Enter` (keep the results and close the bar).
-- **The active match is revealed with surrounding context.** Search jumps place a distant match near the upper third of the tree viewport instead of pinning it to the bottom edge. After `Enter`, the accepted query and match count remain visible while `n` / `N` navigation is available.
+```text
+WHERE / FILTER  / id:7rt1  [status:open]  [label:ui]  1/996     ORDER BY  Created ▼
+```
+
+Plain text searches both issue IDs and titles. Structured predicates target a field:
+
+| Predicate | Example |
+| :--- | :--- |
+| ID | `id:7rt1` |
+| Title | `title:search` |
+| Status | `status:open` |
+| Priority | `priority:1` or `priority:p1` |
+| Type | `type:epic` |
+| Label | `label:ui` |
+| Assignee | `assignee:andre` |
+| Project | `project:b9s` |
+
+Press `Tab` to complete a partially typed field or a value found in the loaded issues. Multiple values for the same field are alternatives, while different fields compose with AND. Prefix a predicate with `!` to exclude it, for example `status:open !label:blocked`.
+
+- **While the query bar is focused, every keystroke goes into the query.** Global shortcuts are suspended, so query characters never trigger actions. Press `Enter` to accept and keep the query visible. Press `Esc` while editing or after acceptance to clear it.
+- **The first result is revealed with surrounding context.** A distant tree result is placed near the upper third of the viewport instead of at the bottom edge. Use `n` / `N` to move through matches.
 - **Search results are scoped to the active label, assignee, and status filters**, so the match count and `n` / `N` navigation only cover issues you can actually see. Changing a filter while a query is active re-scopes the matches. In XRay mode (`x`), search is scoped to the drilled-down subtree.
-- **Occur mode (`O`) turns the query into a filter** and ANDs with the label/assignee/status filter instead of replacing it.
+- **Quick filters stay visible as chips.** The `o`, `c`, `r`, and `a` status shortcuts and label/assignee selections are reflected in the same bar across all views.
 
 ---
 
