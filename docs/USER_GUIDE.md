@@ -47,7 +47,7 @@ Don't just read the title. `bw` gives you the full picture:
 ### 🛠️ Quick Actions
 *   **Export:** Press `E` to export all issues to a timestamped Markdown file with Mermaid diagrams.
 *   **Graph Export (CLI):** `bw --robot-graph` outputs the dependency graph as JSON, DOT (Graphviz), or Mermaid format. Use `--graph-format=dot` for rendering with Graphviz, or `--graph-root=ID --graph-depth=3` to extract focused subgraphs.
-*   **Copy:** Press `C` to copy the selected issue as formatted Markdown to your clipboard.
+*   **Copy:** In the detail view, press `c` to copy the full ticket as Markdown to your clipboard.
 *   **Edit:** Press `O` to open the `.beads/beads.jsonl` file in your preferred GUI editor.
 *   **Time-Travel:** Press `t` to compare against any git revision, or `T` for quick HEAD~5 comparison. Combined with History view (`h`), you can navigate to any commit and see exactly what changed.
 

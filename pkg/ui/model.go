@@ -440,8 +440,9 @@ type Model struct {
 	showTimeTravelPrompt bool
 
 	// Status message (for temporary feedback)
-	statusMsg     string
-	statusIsError bool
+	statusMsg      string
+	statusIsError  bool
+	clipboardWrite func(string) error
 
 	// Workspace mode state
 	workspaceMode    bool            // True when viewing multiple repos
@@ -919,6 +920,7 @@ func NewModel(issues []model.Issue, beadsPath string) Model {
 		labelPicker:      labelPicker,
 		statusMsg:        initialStatus,
 		statusIsError:    initialStatusErr,
+		clipboardWrite:   clipboard.WriteAll,
 		doltPollInterval: config.DefaultRefreshPollInterval,
 		pickerVisible:    true, // bd-2me: visible by default, H toggles (bd-j764)
 		// Tutorial integration (bv-8y31)
@@ -2553,8 +2555,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case focusDetail:
-				// Enter returns to previous view from detail (bd-y0m, bd-yo4)
-				if msg.String() == "enter" {
+				if msg.String() == "c" || msg.String() == "C" {
+					m.copyIssueToClipboard()
+				} else if msg.String() == "enter" {
+					// Enter returns to previous view from detail (bd-y0m, bd-yo4)
 					if m.isBoardView {
 						m.focused = focusBoard
 					} else {
@@ -4293,7 +4297,7 @@ func (m *Model) renderFooter() string {
 			{"^R", "refresh"},
 			{"esc", "back"},
 			{"e", "edit"},
-			{"C", "copy"},
+			{"c", "copy"},
 			{"O", "open"},
 			{"?", "help"},
 			{"esc", "back"},
@@ -4666,6 +4670,18 @@ func (m *Model) updateViewportContent() {
 	if m.updateAvailable {
 		sb.WriteString(fmt.Sprintf("⭐ **Update Available:** [%s](%s)\n\n", m.updateTag, m.updateURL))
 	}
+	sb.WriteString(formatIssueMarkdown(item, m.issueMap))
+
+	rendered, err := m.renderer.Render(sb.String())
+	if err != nil {
+		m.viewport.SetContent(fmt.Sprintf("Error rendering markdown: %v", err))
+	} else {
+		m.viewport.SetContent(rendered)
+	}
+}
+
+func formatIssueMarkdown(item model.Issue, issueMap map[string]*model.Issue) string {
+	var sb strings.Builder
 
 	// Title Block
 	sb.WriteString(fmt.Sprintf("# %s %s\n", GetTypeIconMD(string(item.IssueType)), item.Title))
@@ -4711,7 +4727,7 @@ func (m *Model) updateViewportContent() {
 
 	// Dependency Graph (Tree)
 	if len(item.Dependencies) > 0 {
-		rootNode := BuildDependencyTree(item.ID, m.issueMap, 3) // Max depth 3
+		rootNode := BuildDependencyTree(item.ID, issueMap, 3) // Max depth 3
 		treeStr := RenderDependencyTree(rootNode)
 		sb.WriteString("```\n" + treeStr + "```\n\n")
 	}
@@ -4727,12 +4743,7 @@ func (m *Model) updateViewportContent() {
 		}
 	}
 
-	rendered, err := m.renderer.Render(sb.String())
-	if err != nil {
-		m.viewport.SetContent(fmt.Sprintf("Error rendering markdown: %v", err))
-	} else {
-		m.viewport.SetContent(rendered)
-	}
+	return sb.String()
 }
 
 // truncateString truncates a string to maxLen runes with ellipsis.
@@ -5057,7 +5068,7 @@ func (m Model) renderTimeTravelPrompt() string {
 	)
 }
 
-// copyIssueToClipboard copies the selected issue to clipboard as Markdown
+// copyIssueToClipboard copies the selected issue to the clipboard as Markdown.
 func (m *Model) copyIssueToClipboard() {
 	selectedItem := m.list.SelectedItem()
 	if selectedItem == nil {
@@ -5073,44 +5084,11 @@ func (m *Model) copyIssueToClipboard() {
 		return
 	}
 	issue := issueItem.Issue
-
-	// Format issue as Markdown
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("# %s %s\n\n", GetTypeIconMD(string(issue.IssueType)), issue.Title))
-	sb.WriteString(fmt.Sprintf("**ID:** %s  \n", issue.ID))
-	sb.WriteString(fmt.Sprintf("**Status:** %s  \n", strings.ToUpper(string(issue.Status))))
-	sb.WriteString(fmt.Sprintf("**Priority:** P%d  \n", issue.Priority))
-	if issue.Assignee != "" {
-		sb.WriteString(fmt.Sprintf("**Assignee:** @%s  \n", issue.Assignee))
+	writeClipboard := m.clipboardWrite
+	if writeClipboard == nil {
+		writeClipboard = clipboard.WriteAll
 	}
-	sb.WriteString(fmt.Sprintf("**Created:** %s  \n", issue.CreatedAt.Format("2006-01-02")))
-
-	if len(issue.Labels) > 0 {
-		sb.WriteString(fmt.Sprintf("**Labels:** %s  \n", strings.Join(issue.Labels, ", ")))
-	}
-
-	if issue.Description != "" {
-		sb.WriteString(fmt.Sprintf("\n## Description\n\n%s\n", issue.Description))
-	}
-
-	if issue.AcceptanceCriteria != "" {
-		sb.WriteString(fmt.Sprintf("\n## Acceptance Criteria\n\n%s\n", issue.AcceptanceCriteria))
-	}
-
-	// Dependencies
-	if len(issue.Dependencies) > 0 {
-		sb.WriteString("\n## Dependencies\n\n")
-		for _, dep := range issue.Dependencies {
-			if dep == nil {
-				continue
-			}
-			sb.WriteString(fmt.Sprintf("- %s (%s)\n", dep.DependsOnID, dep.Type))
-		}
-	}
-
-	// Copy to clipboard
-	err := clipboard.WriteAll(sb.String())
+	err := writeClipboard(formatIssueMarkdown(issue, m.issueMap))
 	if err != nil {
 		m.statusMsg = fmt.Sprintf("❌ Clipboard error: %v", err)
 		m.statusIsError = true

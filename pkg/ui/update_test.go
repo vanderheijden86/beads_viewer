@@ -3,6 +3,7 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -23,6 +24,50 @@ func TestCopyIssueToClipboardInvalidItem(t *testing.T) {
 	m.copyIssueToClipboard()
 	if !m.statusIsError || m.statusMsg == "" {
 		t.Fatalf("expected error copying invalid item, got %q", m.statusMsg)
+	}
+}
+
+func TestDetailCKeyCopiesSelectedIssue(t *testing.T) {
+	issue := model.Issue{
+		ID:                 "bd-copy",
+		Title:              "Copy this ticket",
+		Description:        "Full description",
+		Design:             "Design rationale",
+		AcceptanceCriteria: "Copy is complete",
+		Notes:              "Progress notes",
+		Status:             model.StatusOpen,
+		IssueType:          model.TypeTask,
+		Comments: []*model.Comment{{
+			Author: "alex",
+			Text:   "A useful comment",
+		}},
+	}
+	m := NewModel([]model.Issue{issue}, "")
+	m.focused = focusDetail
+	var copied string
+	m.clipboardWrite = func(text string) error {
+		copied = text
+		return nil
+	}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	m = updated.(Model)
+
+	if !strings.Contains(m.statusMsg, "Copied bd-copy to clipboard") {
+		t.Fatalf("expected c in detail view to copy the selected issue, got status %q", m.statusMsg)
+	}
+	for _, want := range []string{
+		"# ✔ Copy this ticket",
+		"### Description\nFull description",
+		"### Design Notes\nDesign rationale",
+		"### Acceptance Criteria\nCopy is complete",
+		"### Notes\nProgress notes",
+		"### Comments (1)",
+		"A useful comment",
+	} {
+		if !strings.Contains(copied, want) {
+			t.Errorf("copied Markdown missing %q:\n%s", want, copied)
+		}
 	}
 }
 

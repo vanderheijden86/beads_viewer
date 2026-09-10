@@ -170,9 +170,9 @@ const contextHelpDetail = `## Detail View
   Esc       Return to list
   Tab       Switch to split view
 
-**Actions (from list view)**
+**Actions**
+  c         Copy full ticket Markdown
   O         Open in editor
-  C         Copy issue ID
 
 **Info Shown**
 • Full description (markdown)
@@ -277,4 +277,3 @@ const contextHelpGeneric = `## Quick Reference
 **Views**
   b         Board view
   E         Tree view`
-
