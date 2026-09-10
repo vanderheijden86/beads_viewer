@@ -1,6 +1,7 @@
 package ui_test
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/vanderheijden86/beadwork/pkg/config"
 	"github.com/vanderheijden86/beadwork/pkg/model"
 	"github.com/vanderheijden86/beadwork/pkg/ui"
+	_ "modernc.org/sqlite"
 )
 
 // createSampleProjects creates temp directories with .beads/issues.jsonl for testing.
@@ -744,16 +746,108 @@ func TestPickerCountsRefreshOnTick(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newM, cmd := m.Update(ui.PickerRefreshTickMsg{})
+	newM, loadCmd := m.Update(ui.PickerRefreshTickMsg{})
 	m = newM.(ui.Model)
 
-	if cmd == nil {
-		t.Error("expected PickerRefreshTickMsg to produce a follow-up tick command")
+	if loadCmd == nil {
+		t.Fatal("expected PickerRefreshTickMsg to produce a count-loading command")
+	}
+	newM, nextTickCmd := m.Update(loadCmd())
+	m = newM.(ui.Model)
+	if nextTickCmd == nil {
+		t.Error("expected refreshed counts to schedule the next tick")
 	}
 
 	updatedView := m.View()
 	if initialView == updatedView {
 		t.Error("expected picker view to change after PickerRefreshTickMsg with modified JSONL")
+	}
+}
+
+func TestPickerCountsUseCanonicalSourceForInactiveProjects(t *testing.T) {
+	root := t.TempDir()
+	activeDir := filepath.Join(root, "active-project")
+	canonicalDir := filepath.Join(root, "canonical-project")
+	for _, dir := range []string{activeDir, canonicalDir} {
+		if err := os.MkdirAll(filepath.Join(dir, ".beads"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	activeJSONL := `{"id":"active-1","title":"Active","status":"open","issue_type":"task","priority":2}` + "\n"
+	if err := os.WriteFile(filepath.Join(activeDir, ".beads", "issues.jsonl"), []byte(activeJSONL), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	staleJSONL := `{"id":"canonical-old","title":"Stale export","status":"in_progress","issue_type":"task","priority":2}` + "\n"
+	if err := os.WriteFile(filepath.Join(canonicalDir, ".beads", "issues.jsonl"), []byte(staleJSONL), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := sql.Open("sqlite", filepath.Join(canonicalDir, ".beads", "beads.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Exec(`
+		CREATE TABLE issues (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL,
+			priority INTEGER DEFAULT 2,
+			issue_type TEXT DEFAULT 'task',
+			created_at DATETIME,
+			updated_at DATETIME,
+			tombstone INTEGER DEFAULT 0
+		);
+		INSERT INTO issues (id, title, status, created_at, updated_at) VALUES
+			('canonical-1', 'Open one', 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+			('canonical-2', 'Open two', 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+			('canonical-3', 'In progress', 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+			('canonical-4', 'Blocked', 'blocked', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+			('canonical-5', 'Closed', 'closed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+	`); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := config.Config{Projects: []config.Project{
+		{Name: "active-project", Path: activeDir},
+		{Name: "canonical-project", Path: canonicalDir},
+	}}
+	activeIssues := []model.Issue{{ID: "active-1", Title: "Active", Status: "open", IssueType: "task", Priority: 2}}
+	m := ui.NewModel(activeIssues, filepath.Join(activeDir, ".beads", "issues.jsonl")).
+		WithConfig(cfg, "active-project", activeDir)
+	newM, loadCmd := m.Update(ui.PickerRefreshTickMsg{})
+	m = newM.(ui.Model)
+	if loadCmd == nil {
+		t.Fatal("expected PickerRefreshTickMsg to produce a count-loading command")
+	}
+	newM, _ = m.Update(loadCmd())
+	m = newM.(ui.Model)
+
+	var canonicalEntry *ui.ProjectEntry
+	entries := m.BuildProjectEntries()
+	for i := range entries {
+		entry := entries[i]
+		if entry.Project.Name == "canonical-project" {
+			canonicalEntry = &entry
+			break
+		}
+	}
+	if canonicalEntry == nil {
+		t.Fatal("canonical-project not found in entries")
+	}
+	if canonicalEntry.OpenCount != 2 {
+		t.Errorf("expected OpenCount=2 from canonical source, got %d", canonicalEntry.OpenCount)
+	}
+	if canonicalEntry.InProgressCount != 1 {
+		t.Errorf("expected InProgressCount=1 from canonical source, got %d", canonicalEntry.InProgressCount)
+	}
+	if canonicalEntry.ReadyCount != 3 {
+		t.Errorf("expected ReadyCount=3 from canonical source, got %d", canonicalEntry.ReadyCount)
+	}
+	if canonicalEntry.BlockedCount != 1 {
+		t.Errorf("expected BlockedCount=1 from canonical source, got %d", canonicalEntry.BlockedCount)
 	}
 }
 
