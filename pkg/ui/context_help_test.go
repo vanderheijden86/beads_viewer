@@ -185,6 +185,9 @@ func TestContextHelpKeyboardShortcuts(t *testing.T) {
 		{ContextDetail, "Esc"},
 		{ContextSplit, "Tab"},
 		{ContextFilter, "/"},
+		{ContextTree, "K  Close"},
+		{ContextTree, "Del  Delete"},
+		{ContextBoard, "K / Del   Close / delete"},
 	}
 
 	for _, tt := range tests {

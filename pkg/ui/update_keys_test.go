@@ -1,11 +1,104 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
-	"github.com/vanderheijden86/beadwork/pkg/model"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/vanderheijden86/beadwork/pkg/model"
 )
+
+func TestShiftKClosesSelectedIssueAfterConfirmation(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "bd-123", Title: "Close this ticket", Status: model.StatusOpen},
+	}
+	m := NewModel(issues, "")
+	m.issueWriter = &IssueWriter{bdPath: "/bin/echo", available: true}
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatal("Shift+K must wait for confirmation before closing")
+	}
+	view := m.View()
+	if !strings.Contains(view, "Close issue?") {
+		t.Fatalf("expected close confirmation, got:\n%s", view)
+	}
+	if !strings.Contains(view, "bd-123") || !strings.Contains(view, "Close this ticket") {
+		t.Fatal("close confirmation must identify the selected issue")
+	}
+	if !strings.Contains(view, "[Y] Close") || !strings.Contains(view, "[Esc] Cancel") {
+		t.Fatal("close confirmation must show explicit confirm and cancel buttons")
+	}
+
+	updated, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("y")})
+	m = updated.(Model)
+	if cmd == nil {
+		t.Fatal("confirming close must return a command")
+	}
+	msg := cmd()
+	result, ok := msg.(BdResultMsg)
+	if !ok {
+		t.Fatalf("expected BdResultMsg, got %T", msg)
+	}
+	if result.Operation != BdOpClose || result.IssueID != "bd-123" || !result.Success {
+		t.Fatalf("unexpected close result: %#v", result)
+	}
+	if strings.Contains(m.View(), "Close issue?") {
+		t.Fatal("close confirmation must dismiss after confirmation")
+	}
+}
+
+func TestShiftKCloseConfirmationCanBeCancelled(t *testing.T) {
+	m := NewModel([]model.Issue{
+		{ID: "bd-123", Title: "Keep this ticket open", Status: model.StatusOpen},
+	}, "")
+	m.issueWriter = &IssueWriter{bdPath: "/bin/echo", available: true}
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
+	m = updated.(Model)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatal("cancelling close must not run a command")
+	}
+	if strings.Contains(m.View(), "Close issue?") {
+		t.Fatal("close confirmation must dismiss after cancellation")
+	}
+}
+
+func TestDeleteKeyRetainsDeleteConfirmation(t *testing.T) {
+	m := NewModel([]model.Issue{
+		{ID: "bd-123", Title: "Discard this ticket", Status: model.StatusOpen},
+	}, "")
+
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyDelete})
+	m = updated.(Model)
+	if cmd != nil {
+		t.Fatal("Delete must wait for confirmation before deleting")
+	}
+	if !strings.Contains(m.View(), "Delete issue?") {
+		t.Fatalf("expected delete confirmation, got:\n%s", m.View())
+	}
+}
+
+func TestShiftKTargetsBoardSelection(t *testing.T) {
+	m := NewModel([]model.Issue{
+		{ID: "bd-tree", Title: "Tree selection", Status: model.StatusOpen},
+		{ID: "bd-board", Title: "Board selection", Status: model.StatusBlocked},
+	}, "")
+	m.tree.SelectByID("bd-tree")
+	m.board.SelectIssueByID("bd-board")
+	m.isBoardView = true
+	m.focused = focusBoard
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
+	m = updated.(Model)
+	view := m.View()
+	if !strings.Contains(view, "bd-board") || strings.Contains(view, "bd-tree") {
+		t.Fatalf("close confirmation must target the active board selection, got:\n%s", view)
+	}
+}
 
 // Cover additional branches in Model.Update for quit/help/tab handling and update notices (bd-8hw.4).
 func TestUpdateHelpQuitAndTabFocus(t *testing.T) {

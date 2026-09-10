@@ -5,6 +5,26 @@
 
 > A fast, focused TUI viewer and editor for [Beads](https://github.com/steveyegge/beads) issue tracking projects. Inspired by [k9s](https://k9scli.io/).
 
+## Contents
+
+- [What is this?](#what-is-this)
+  - [Why strip it down?](#why-strip-it-down)
+- [Features](#features)
+  - [Relationship to the original](#relationship-to-the-original)
+- [Installation](#installation)
+  - [Homebrew (macOS/Linux)](#homebrew-macoslinux)
+  - [From source](#from-source)
+- [Quick Start](#quick-start)
+- [Data Backends](#data-backends)
+  - [Source Priority](#source-priority)
+  - [Dolt Server Mode](#dolt-server-mode)
+  - [Embedded Dolt Mode](#embedded-dolt-mode)
+  - [JSONL and SQLite (Legacy)](#jsonl-and-sqlite-legacy)
+  - [Fallback Behavior](#fallback-behavior)
+- [Keyboard Quick Reference](#keyboard-quick-reference)
+- [Acknowledgments](#acknowledgments)
+- [License](#license)
+
 ## What is this?
 
 B9s is a terminal-based interface for browsing, editing, and managing Beads issues. It supports multiple data backends natively (Dolt, SQLite, JSONL) and renders your issue data as an interactive TUI with list, tree, and kanban board views, a detail panel with Markdown rendering, and inline editing.
@@ -189,6 +209,8 @@ If B9s cannot connect to the configured Dolt server, it falls back to the next a
 | `E` | Tree view |
 | `e` | Edit issue |
 | `Ctrl+n` | Create new issue |
+| `Shift+K` | Close selected issue after confirmation |
+| `Delete` | Permanently delete selected issue after confirmation |
 | `?` | Keyboard shortcuts help |
 | `[` / `]` | Resize split pane |
 

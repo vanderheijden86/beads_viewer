@@ -243,6 +243,33 @@ func TestTreeViewEnterAndExit(t *testing.T) {
 	containsAll(t, out, []string{"Epic One", "Task One"})
 }
 
+func TestTreeViewShiftKShowsCloseConfirmation(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTreeFixture(t, tempDir, []treeFixtureIssue{
+		{
+			ID:        "close-1",
+			Title:     "Close from the TUI",
+			Status:    "open",
+			Priority:  2,
+			IssueType: "task",
+			CreatedAt: time.Now().Format(time.RFC3339),
+		},
+	})
+
+	out, err := runTreeTUI(t, tempDir, 1800, []keyStep{k("K")})
+	if err != nil {
+		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
+	}
+
+	containsAll(t, out, []string{
+		"Close issue?",
+		"close-1",
+		"Close from the TUI",
+		"[Y] Close",
+		"[Esc] Cancel",
+	})
+}
+
 func TestTreeViewCreatedSortNumberedChildren(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Now()

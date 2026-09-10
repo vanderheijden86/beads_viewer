@@ -101,6 +101,8 @@ const contextHelpList = `## List View
 
 **Actions**
   y         Copy issue ID
+  K         Close issue (confirm)
+  Del       Delete issue (confirm)
   t/T       Time-travel
   U         Self-update bv`
 
@@ -130,7 +132,10 @@ const contextHelpTree = `## Tree View
 **Modes**
   O  Occur   x  XRay
   ` + "`" + `  Flat    F  Follow
-  b/B  Bookmark/cycle   m/M  Mark`
+  b/B  Bookmark/cycle   m/M  Mark
+
+**Actions**
+  K  Close (confirm)   Del  Delete (confirm)`
 
 const contextHelpBoard = `## Board View
 
@@ -160,6 +165,7 @@ const contextHelpBoard = `## Board View
   Tab       Toggle detail panel
   Ctrl+j/k  Scroll detail panel
   y         Copy issue ID
+  K / Del   Close / delete (confirm)
   Enter     View issue details
   Esc       Return to List view`
 
