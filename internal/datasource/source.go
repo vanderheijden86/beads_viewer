@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/vanderheijden86/beadwork/pkg/loader"
 )
 
 // SourceType identifies the type of data source
@@ -285,56 +287,29 @@ func discoverSQLiteSources(beadsDir string, opts DiscoveryOptions) ([]DataSource
 	return sources, nil
 }
 
-// discoverLocalJSONLSources finds JSONL files in the beads directory
+// discoverLocalJSONLSources finds the canonical issue JSONL in the beads directory.
 func discoverLocalJSONLSources(beadsDir string, opts DiscoveryOptions) ([]DataSource, error) {
-	var sources []DataSource
-
-	entries, err := os.ReadDir(beadsDir)
+	path, err := loader.FindJSONLPath(beadsDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read beads directory: %w", err)
+		return nil, err
 	}
 
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		name := e.Name()
-
-		// Must be a .jsonl file
-		if !strings.HasSuffix(name, ".jsonl") {
-			continue
-		}
-
-		// Skip backups, merge artifacts, and deletion manifests
-		if strings.Contains(name, ".backup") ||
-			strings.Contains(name, ".orig") ||
-			strings.Contains(name, ".merge") ||
-			name == "deletions.jsonl" ||
-			strings.HasPrefix(name, "beads.left") ||
-			strings.HasPrefix(name, "beads.right") {
-			continue
-		}
-
-		path := filepath.Join(beadsDir, name)
-		info, err := e.Info()
-		if err != nil {
-			continue
-		}
-
-		sources = append(sources, DataSource{
-			Type:     SourceTypeJSONLLocal,
-			Path:     path,
-			Priority: PriorityJSONLLocal,
-			ModTime:  info.ModTime(),
-			Size:     info.Size(),
-		})
-
-		if opts.Verbose {
-			opts.Logger(fmt.Sprintf("Found local JSONL: %s (mod=%s)", path, info.ModTime().Format(time.RFC3339)))
-		}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("cannot inspect JSONL source: %w", err)
 	}
 
-	return sources, nil
+	if opts.Verbose {
+		opts.Logger(fmt.Sprintf("Found local JSONL: %s (mod=%s)", path, info.ModTime().Format(time.RFC3339)))
+	}
+
+	return []DataSource{{
+		Type:     SourceTypeJSONLLocal,
+		Path:     path,
+		Priority: PriorityJSONLLocal,
+		ModTime:  info.ModTime(),
+		Size:     info.Size(),
+	}}, nil
 }
 
 // discoverWorktreeSources finds JSONL files in git worktree beads directories

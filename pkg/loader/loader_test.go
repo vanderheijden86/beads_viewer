@@ -50,6 +50,24 @@ func TestFindJSONLPath_NoJSONLFiles(t *testing.T) {
 	}
 }
 
+func TestFindJSONLPath_IgnoresAuxiliaryJournals(t *testing.T) {
+	dir := t.TempDir()
+	auxiliaryFiles := []string{
+		"correlation_feedback.jsonl",
+		"interactions.jsonl",
+		"sync_base.jsonl",
+	}
+	for _, name := range auxiliaryFiles {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := loader.FindJSONLPath(dir); err == nil {
+		t.Fatal("expected no issue JSONL source when only auxiliary journals exist")
+	}
+}
+
 func TestFindJSONLPath_PrefersBeadsJSONL(t *testing.T) {
 	dir := t.TempDir()
 	// Create multiple JSONL files

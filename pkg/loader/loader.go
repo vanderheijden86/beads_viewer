@@ -23,6 +23,12 @@ const BeadsDirEnvVar = "BEADS_DIR"
 // the same file that bd writes to in stealth/direct mode. Fixes bv-96.
 var PreferredJSONLNames = []string{"beads.jsonl", "issues.jsonl", "beads.base.jsonl"}
 
+var auxiliaryJSONLNames = map[string]struct{}{
+	"correlation_feedback.jsonl": {},
+	"interactions.jsonl":         {},
+	"sync_base.jsonl":            {},
+}
+
 // GetBeadsDir returns the beads directory path, respecting BEADS_DIR env var.
 // If BEADS_DIR is set, it is used directly.
 // Otherwise, falls back to .beads in the given repoPath (or cwd if empty).
@@ -133,6 +139,9 @@ func FindJSONLPathWithWarnings(beadsDir string, warnFunc func(msg string)) (stri
 
 		// Must be a .jsonl file
 		if !strings.HasSuffix(name, ".jsonl") {
+			continue
+		}
+		if _, auxiliary := auxiliaryJSONLNames[name]; auxiliary {
 			continue
 		}
 
