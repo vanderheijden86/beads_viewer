@@ -182,13 +182,29 @@ func fuzzyTextMatch(candidate, query string) bool {
 		return true
 	}
 
-	// Long subsequences match ordinary prose by chance and cease to express a
+	compactQuery := strings.Join(strings.Fields(query), "")
+	// Long subsequences match ordinary text by chance and cease to express a
 	// useful fuzzy relationship. Exact substrings remain unbounded.
 	const maxFuzzySubsequenceLength = 16
-	if len(query) > maxFuzzySubsequenceLength {
+	if len(compactQuery) > maxFuzzySubsequenceLength {
 		return false
 	}
-	return fuzzyScore(candidate, query) > 0
+
+	// A fuzzy match may span a short phrase, but never an entire prose field.
+	// This keeps abbreviations useful without turning common letter sequences
+	// into matches for nearly every issue description or note.
+	const maxFuzzyWindowWords = 2
+	terms := strings.Fields(candidate)
+	for start := range terms {
+		window := ""
+		for end := start; end < len(terms) && end < start+maxFuzzyWindowWords; end++ {
+			window += terms[end]
+			if fuzzyScore(window, compactQuery) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func issueMatchesFuzzyText(issue model.Issue, query string) bool {

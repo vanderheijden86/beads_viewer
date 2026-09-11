@@ -179,3 +179,36 @@ func TestGlobalFuzzySearchRejectsLongSparseSubsequenceE2E(t *testing.T) {
 		t.Fatalf("long sparse query retained unrelated issues\noutput:\n%s", out)
 	}
 }
+
+func TestGlobalSearchShowsOnlyRelevantPreventResultE2E(t *testing.T) {
+	tempDir := t.TempDir()
+	now := time.Now()
+	writeTreeFixture(t, tempDir, []treeFixtureIssue{
+		{ID: "prevent-fuzzy", Title: "Prevent fuzzy search from matching unrelated issues", Status: "closed", Priority: 1, IssueType: "bug", CreatedAt: now.Format(time.RFC3339)},
+		{ID: "publish-release", Title: "Publish release verification events", Status: "closed", Priority: 1, IssueType: "task", CreatedAt: now.Add(time.Second).Format(time.RFC3339)},
+		{ID: "dependency-task", Title: "Make dependency blocking visible in the TUI", Status: "open", Priority: 1, IssueType: "epic", CreatedAt: now.Add(2 * time.Second).Format(time.RFC3339)},
+	})
+
+	out, err := runTreeTUI(t, tempDir, 2500, []keyStep{
+		kd("/", 150*time.Millisecond),
+		kd("prevent", 200*time.Millisecond),
+	})
+	if err != nil {
+		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
+	}
+
+	s := string(out)
+	queryStart := strings.LastIndex(s, "/ prevent")
+	if queryStart < 0 {
+		t.Fatalf("final query was not rendered\noutput:\n%s", s)
+	}
+	finalFrame := s[queryStart:]
+	if !strings.Contains(finalFrame, "Prevent fuzzy search from matching unrelated issues") {
+		t.Fatalf("matching prevent issue is absent\noutput:\n%s", s)
+	}
+	for _, unrelated := range []string{"Publish release verification events", "Make dependency blocking visible in the TUI"} {
+		if strings.Contains(finalFrame, unrelated) {
+			t.Errorf("query retained unrelated issue %q\noutput:\n%s", unrelated, s)
+		}
+	}
+}

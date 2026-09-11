@@ -57,7 +57,7 @@ func TestIssueQueryPlainTextFuzzyMatchesSearchableContent(t *testing.T) {
 	tests := map[string]string{
 		"description":         "clbdel",
 		"design":              "cnmtr",
-		"acceptance criteria": "lblrd",
+		"acceptance criteria": "lbls",
 		"notes":               "spctrscp",
 		"status":              "inprg",
 		"priority":            "p1",
@@ -67,13 +67,73 @@ func TestIssueQueryPlainTextFuzzyMatchesSearchableContent(t *testing.T) {
 		"project":             "b9",
 		"external reference":  "ghb482",
 		"comment author":      "optr",
-		"comment text":        "fzmtcmt",
+		"comment text":        "cmnts",
 	}
 
 	for name, raw := range tests {
 		t.Run(name, func(t *testing.T) {
 			if query := ParseIssueQuery(raw); !query.Matches(issue) {
 				t.Errorf("plain query %q did not fuzzy-match %s", raw, name)
+			}
+		})
+	}
+}
+
+func TestIssueQueryPlainTextDistinguishesRelevantTermsFromScatteredLetters(t *testing.T) {
+	tests := []struct {
+		name  string
+		raw   string
+		issue model.Issue
+		want  bool
+	}{
+		{
+			name:  "exact title term",
+			raw:   "prevent",
+			issue: model.Issue{Title: "Prevent fuzzy search from matching unrelated issues"},
+			want:  true,
+		},
+		{
+			name:  "fuzzy title abbreviation",
+			raw:   "prvnt",
+			issue: model.Issue{Title: "Prevent fuzzy search from matching unrelated issues"},
+			want:  true,
+		},
+		{
+			name:  "fuzzy label abbreviation",
+			raw:   "lna1",
+			issue: model.Issue{Labels: []string{"lane-attempt=1"}},
+			want:  true,
+		},
+		{
+			name:  "letters scattered across title words",
+			raw:   "prevent",
+			issue: model.Issue{Title: "Publish release verification events"},
+			want:  false,
+		},
+		{
+			name:  "letters scattered across release notes",
+			raw:   "prevent",
+			issue: model.Issue{Notes: "The previous release completed successfully and the current version remains available"},
+			want:  false,
+		},
+		{
+			name:  "unrelated task",
+			raw:   "prevent",
+			issue: model.Issue{Title: "Make dependency blocking visible in the TUI"},
+			want:  false,
+		},
+		{
+			name:  "no hit",
+			raw:   "zzzzzz",
+			issue: model.Issue{Title: "Prevent fuzzy search from matching unrelated issues"},
+			want:  false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := ParseIssueQuery(test.raw).Matches(test.issue); got != test.want {
+				t.Errorf("query %q match = %t, want %t for issue %+v", test.raw, got, test.want, test.issue)
 			}
 		})
 	}
@@ -266,5 +326,74 @@ func TestModelQueryFiltersTreeListAndBoard(t *testing.T) {
 	}
 	if got := m.tree.NodeCount(); got != 1 {
 		t.Errorf("tree nodes = %d, want 1", got)
+	}
+}
+
+func TestModelQueryFiltersAllViewsByRepresentativeCases(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "prevent-fuzzy", Title: "Prevent fuzzy search from matching unrelated issues", Labels: []string{"search"}},
+		{ID: "publish-release", Title: "Publish release verification events", Notes: "The previous release completed successfully and the current version remains available"},
+		{ID: "lane-task", Title: "Dispatch work", Labels: []string{"lane-attempt=1"}},
+		{ID: "dependency-task", Title: "Make dependency blocking visible in the TUI", Labels: []string{"backend"}},
+	}
+
+	tests := []struct {
+		name string
+		raw  string
+		want int
+	}{
+		{name: "exact term", raw: "prevent", want: 1},
+		{name: "fuzzy abbreviation", raw: "prvnt", want: 1},
+		{name: "fuzzy label", raw: "lna1", want: 1},
+		{name: "structured partial label", raw: "label:l", want: 1},
+		{name: "incomplete predicate", raw: "label:", want: len(issues)},
+		{name: "no hit", raw: "zzzzzz", want: 0},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			m := NewModel(issues, "")
+			m.tree.Build(issues)
+			m.setQueryText(test.raw)
+
+			if got := len(m.list.Items()); got != test.want {
+				t.Errorf("list query %q shows %d issues, want %d", test.raw, got, test.want)
+			}
+			if got := len(m.board.allIssues); got != test.want {
+				t.Errorf("board query %q shows %d issues, want %d", test.raw, got, test.want)
+			}
+			if got := m.tree.NodeCount(); got != test.want {
+				t.Errorf("tree query %q shows %d issues (%v), want %d", test.raw, got, treeVisibleIDs(&m.tree), test.want)
+			}
+		})
+	}
+}
+
+func TestTreeQueryRetainsOnlyAncestorsNeededForContext(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "epic", Title: "Search improvements", IssueType: model.TypeEpic},
+		{
+			ID:        "matching-child",
+			Title:     "Prevent unrelated fuzzy matches",
+			IssueType: model.TypeTask,
+			Dependencies: []*model.Dependency{
+				{IssueID: "matching-child", DependsOnID: "epic", Type: model.DepParentChild},
+			},
+		},
+		{ID: "unrelated-root", Title: "Publish release verification events", IssueType: model.TypeTask},
+	}
+	m := NewModel(issues, "")
+	m.tree.Build(issues)
+
+	m.setQueryText("prevent")
+
+	if got := treeVisibleIDs(&m.tree); len(got) != 2 || got[0] != "epic" || got[1] != "matching-child" {
+		t.Errorf("visible tree IDs = %v, want context ancestor and matching child", got)
+	}
+	if got := len(m.list.Items()); got != 1 {
+		t.Errorf("list shows %d issues, want only the matching child", got)
+	}
+	if got := len(m.board.allIssues); got != 1 {
+		t.Errorf("board shows %d issues, want only the matching child", got)
 	}
 }
