@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/vanderheijden86/beadwork/pkg/model"
@@ -16,6 +17,19 @@ func TestIssueQueryPlainTextMatchesIDAndTitle(t *testing.T) {
 	}
 	if query := ParseIssueQuery("unrelated"); query.Matches(issue) {
 		t.Error("unrelated plain query matched issue")
+	}
+}
+
+func TestIssueQueryRejectsLongSparseSubsequence(t *testing.T) {
+	const raw = "assetdeasdfjsladkfjsadfjsadf"
+	issue := model.Issue{
+		ID:          "issue-1",
+		Title:       "Unrelated task",
+		Description: strings.Join(strings.Split(raw, ""), " unrelated "),
+	}
+
+	if query := ParseIssueQuery(raw); query.Matches(issue) {
+		t.Error("long sparse subsequence matched an unrelated issue")
 	}
 }
 

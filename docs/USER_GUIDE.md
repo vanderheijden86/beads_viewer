@@ -2587,7 +2587,7 @@ Press `/` in the tree, list, or board to reveal and focus one shared search fiel
 ╰──────────────────────────────────────────────────────────────╯
 ```
 
-Plain text fuzzily searches IDs, titles, descriptions, design notes, acceptance criteria, notes, status, priority, type, labels, assignees, projects, external references, and comments. Structured predicates constrain fuzzy matching to a field:
+Plain text searches IDs, titles, descriptions, design notes, acceptance criteria, notes, status, priority, type, labels, assignees, projects, external references, and comments. Short queries support fuzzy subsequence matching; longer queries require a contiguous text match so unrelated prose does not match by chance. Structured predicates constrain matching to a field:
 
 | Predicate | Example |
 | :--- | :--- |

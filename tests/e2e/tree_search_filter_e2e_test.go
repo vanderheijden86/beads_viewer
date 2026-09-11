@@ -156,3 +156,26 @@ func TestGlobalFuzzyLabelSearchE2E(t *testing.T) {
 		t.Errorf("fuzzy label query produced an empty result set\noutput:\n%s", s)
 	}
 }
+
+func TestGlobalFuzzySearchRejectsLongSparseSubsequenceE2E(t *testing.T) {
+	const raw = "assetdeasdfjsladkfjsadfjsadf"
+	tempDir := t.TempDir()
+	now := time.Now()
+	sparseTitle := strings.Join(strings.Split(raw, ""), " unrelated ")
+	writeTreeFixture(t, tempDir, []treeFixtureIssue{
+		{ID: "unrelated-1", Title: sparseTitle, Status: "open", Priority: 1, IssueType: "task", CreatedAt: now.Format(time.RFC3339)},
+		{ID: "unrelated-2", Title: sparseTitle, Status: "open", Priority: 2, IssueType: "task", CreatedAt: now.Add(time.Second).Format(time.RFC3339)},
+	})
+
+	steps := []keyStep{kd("/", 150*time.Millisecond)}
+	for _, char := range raw {
+		steps = append(steps, kd(string(char), 20*time.Millisecond))
+	}
+	out, err := runTreeTUI(t, tempDir, 3000, steps)
+	if err != nil {
+		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "No issues to display.") {
+		t.Fatalf("long sparse query retained unrelated issues\noutput:\n%s", out)
+	}
+}

@@ -172,7 +172,23 @@ func predicateMatchesIssue(predicate issueQueryPredicate, issue model.Issue) boo
 }
 
 func fuzzyTextMatch(candidate, query string) bool {
-	return query != "" && fuzzyScore(candidate, query) > 0
+	query = strings.ToLower(strings.TrimSpace(query))
+	if query == "" {
+		return false
+	}
+
+	candidate = strings.ToLower(candidate)
+	if strings.Contains(candidate, query) {
+		return true
+	}
+
+	// Long subsequences match ordinary prose by chance and cease to express a
+	// useful fuzzy relationship. Exact substrings remain unbounded.
+	const maxFuzzySubsequenceLength = 16
+	if len(query) > maxFuzzySubsequenceLength {
+		return false
+	}
+	return fuzzyScore(candidate, query) > 0
 }
 
 func issueMatchesFuzzyText(issue model.Issue, query string) bool {
