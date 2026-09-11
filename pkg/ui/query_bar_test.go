@@ -66,10 +66,8 @@ func TestSharedQueryFiltersByIDAndPersistsAfterAccept(t *testing.T) {
 	}
 
 	bar := stripANSI(m.renderUnifiedTitleBar(120))
-	for _, want := range []string{"WHERE / FILTER", "id:bv-3", "1/4", "ORDER BY"} {
-		if !strings.Contains(bar, want) {
-			t.Errorf("query bar %q does not contain %q", bar, want)
-		}
+	if !strings.Contains(bar, "/ id:bv-3") {
+		t.Errorf("query bar %q does not contain the accepted search", bar)
 	}
 }
 
@@ -110,21 +108,52 @@ func TestQueryTabCompletesFieldsAndValues(t *testing.T) {
 	}
 }
 
-func TestQueryBarShowsLegacyFiltersAsChips(t *testing.T) {
+func TestQueryBarKeepsSearchReadableWithLegacyFilters(t *testing.T) {
 	m := newSearchFilterModel(t, "ui")
 	m.currentFilter = "open"
 	m.assigneeFilter = "ann"
 	m.setQueryText("id:bv")
 
 	bar := stripANSI(m.renderUnifiedTitleBar(160))
-	for _, want := range []string{"[status:open]", "[label:ui]", "[assignee:ann]"} {
-		if !strings.Contains(bar, want) {
-			t.Errorf("query bar %q does not contain filter chip %q", bar, want)
+	if !strings.Contains(bar, "/ id:bv") {
+		t.Errorf("query bar %q does not contain the active search", bar)
+	}
+	for _, hiddenFilter := range []string{"[status:open]", "[label:ui]", "[assignee:ann]"} {
+		if strings.Contains(bar, hiddenFilter) {
+			t.Errorf("query bar %q contains legacy filter chip %q", bar, hiddenFilter)
 		}
 	}
 }
 
-func TestTreeQuickFilterFeedsSharedBar(t *testing.T) {
+func TestQueryBarUsesCleanBorderedSearchField(t *testing.T) {
+	m := newSearchFilterModel(t, "ui")
+	m.currentFilter = "open"
+	m.assigneeFilter = "ann"
+	m.setQueryText("lane-a")
+	m.queryState.StartEditing()
+
+	bar := stripANSI(m.renderUnifiedTitleBar(80))
+	lines := strings.Split(bar, "\n")
+	if len(lines) != 3 {
+		t.Fatalf("search field height = %d, want 3 lines: %q", len(lines), bar)
+	}
+	if !strings.HasPrefix(lines[0], "╭") || !strings.HasSuffix(lines[0], "╮") {
+		t.Errorf("search field top border is incomplete: %q", lines[0])
+	}
+	if !strings.HasPrefix(lines[2], "╰") || !strings.HasSuffix(lines[2], "╯") {
+		t.Errorf("search field bottom border is incomplete: %q", lines[2])
+	}
+	if !strings.Contains(lines[1], "/ lane-a█") {
+		t.Errorf("search field does not contain query and cursor: %q", lines[1])
+	}
+	for _, clutter := range []string{"WHERE / FILTER", "ORDER BY", "[status:", "[label:", "[assignee:", "[project:", "⇥"} {
+		if strings.Contains(bar, clutter) {
+			t.Errorf("search field contains %q clutter: %q", clutter, bar)
+		}
+	}
+}
+
+func TestTreeQuickFilterRemainsActiveWithCleanSearchBar(t *testing.T) {
 	m := newSearchFilterModel(t, "")
 	m = typeKeys(m, "o")
 
@@ -132,7 +161,7 @@ func TestTreeQuickFilterFeedsSharedBar(t *testing.T) {
 		t.Fatalf("model filter = %q, want open", got)
 	}
 	bar := stripANSI(m.renderUnifiedTitleBar(120))
-	if !strings.Contains(bar, "[status:open]") {
-		t.Fatalf("query bar %q does not show the tree's status filter", bar)
+	if strings.Contains(bar, "[status:open]") {
+		t.Fatalf("query bar %q includes status-filter clutter", bar)
 	}
 }

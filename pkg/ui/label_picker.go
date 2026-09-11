@@ -148,24 +148,24 @@ func (m *LabelPickerModel) filterLabels() {
 	}
 }
 
-// fuzzyScore returns a score for how well query matches label (0 = no match)
+// fuzzyScore returns a score for how well query matches candidate (0 = no match).
 // Uses fzf-style scoring: consecutive matches, word boundary bonuses
-func fuzzyScore(label, query string) int {
-	label = strings.ToLower(label)
+func fuzzyScore(candidate, query string) int {
+	candidate = strings.ToLower(candidate)
 	query = strings.ToLower(query)
 
 	// Exact match gets highest score
-	if label == query {
+	if candidate == query {
 		return 1000
 	}
 
 	// Prefix match gets high score
-	if strings.HasPrefix(label, query) {
+	if strings.HasPrefix(candidate, query) {
 		return 500 + len(query)
 	}
 
 	// Contains match
-	if strings.Contains(label, query) {
+	if strings.Contains(candidate, query) {
 		return 200 + len(query)
 	}
 
@@ -175,8 +175,8 @@ func fuzzyScore(label, query string) int {
 	consecutive := 0
 	lastMatchIdx := -1
 
-	for li < len(label) && qi < len(query) {
-		if label[li] == query[qi] {
+	for li < len(candidate) && qi < len(query) {
+		if candidate[li] == query[qi] {
 			qi++
 			matchScore := 10
 
@@ -189,7 +189,7 @@ func fuzzyScore(label, query string) int {
 			}
 
 			// Bonus for word boundary match
-			if li == 0 || !unicode.IsLetter(rune(label[li-1])) {
+			if li == 0 || !unicode.IsLetter(rune(candidate[li-1])) {
 				matchScore += 15
 			}
 

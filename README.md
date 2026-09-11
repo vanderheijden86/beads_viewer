@@ -42,7 +42,8 @@ B9s takes the opposite approach: **do fewer things well**. By stripping the code
 ## Features
 
 - **Tree view** with parent/child hierarchy, split-pane detail, search with occurrence filtering, bookmarking, and XRay drill-down. Created-date sorting orders top-level items by date and descendants within epics by ascending natural title (1, 2, 3, …, 10), including numbered title prefixes and nested epics.
-- **List view** with fuzzy search, sorting (created, priority, updated), and status/label filtering
+- **Global fuzzy search** across issue metadata and content, shared by tree, list, and board
+- **List view** with sorting (created, priority, updated) and status/label filtering
 - **Kanban board** with three swimlane modes: by status, by priority, and by type
 - **Detail panel** with full Markdown rendering (via Glamour), scrollable and toggleable
 - **Project picker** (k9s-style header) with multi-project switching, favorites (1-9 keys), and issue count columns (Open, In Progress, Ready)

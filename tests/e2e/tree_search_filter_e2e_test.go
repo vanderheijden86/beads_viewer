@@ -28,12 +28,8 @@ func makeLabelSearchFixture(t *testing.T) []treeFixtureIssue {
 	}
 }
 
-// TestTreeSearchKeepsLabelFilterE2E drives the real TUI: apply a label filter,
-// then type a free-text query containing "a".
-//
-// Before the fix the "a" keystroke fired the global "clear all filters"
-// shortcut, so the query came out as "lpha" and the label filter was gone.
-// The shared query bar shows the full query, label chip, and one live result.
+// TestTreeSearchKeepsLabelFilterE2E drives the real TUI through a composed
+// label filter and free-text query.
 func TestTreeSearchKeepsLabelFilterE2E(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTreeFixture(t, tempDir, makeLabelSearchFixture(t))
@@ -53,13 +49,45 @@ func TestTreeSearchKeepsLabelFilterE2E(t *testing.T) {
 	}
 
 	s := string(out)
-	if !strings.Contains(s, "WHERE / FILTER") || !strings.Contains(s, "/ alpha") {
-		t.Errorf("shared query bar never showed the full query %q\noutput:\n%s", "alpha", s)
+	if !strings.Contains(s, "/ alpha█") {
+		t.Errorf("shared search field never showed the full query %q\noutput:\n%s", "alpha", s)
 	}
-	if !strings.Contains(s, "[label:bug]") || !strings.Contains(s, "1/5") {
-		t.Errorf("expected the bar to show the active label and one result out of five\noutput:\n%s", s)
+	if !strings.Contains(s, "╭") || !strings.Contains(s, "╰") {
+		t.Errorf("expected a bordered search field\noutput:\n%s", s)
 	}
-	if !strings.Contains(s, "ORDER BY") {
-		t.Errorf("expected the query bar to show the active ordering\noutput:\n%s", s)
+	if strings.Contains(s, "WHERE / FILTER") || strings.Contains(s, "ORDER BY") {
+		t.Errorf("search field contains query-plan clutter\noutput:\n%s", s)
+	}
+}
+
+// TestGlobalFuzzyLabelSearchE2E verifies that plain text can find an issue by
+// an abbreviated label even when the title and ID do not contain the query.
+func TestGlobalFuzzyLabelSearchE2E(t *testing.T) {
+	tempDir := t.TempDir()
+	now := time.Now()
+	writeTreeFixture(t, tempDir, []treeFixtureIssue{
+		{ID: "dispatch-1", Title: "Dispatch first lane", Status: "open", Priority: 1, IssueType: "task",
+			CreatedAt: now.Format(time.RFC3339), Labels: []string{"lane-attempt=1"}},
+		{ID: "queue-1", Title: "Queue maintenance", Status: "open", Priority: 2, IssueType: "task",
+			CreatedAt: now.Add(time.Second).Format(time.RFC3339), Labels: []string{"queue"}},
+	})
+
+	out, err := runTreeTUI(t, tempDir, 3000, []keyStep{
+		kd("/", 150*time.Millisecond),
+		kd("l", 80*time.Millisecond),
+		kd("n", 80*time.Millisecond),
+		kd("a", 80*time.Millisecond),
+		kd("1", 80*time.Millisecond),
+	})
+	if err != nil {
+		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
+	}
+
+	s := string(out)
+	if !strings.Contains(s, "/ lna1█") {
+		t.Errorf("search field never showed fuzzy label query\noutput:\n%s", s)
+	}
+	if strings.Contains(s, "No issues to display.") {
+		t.Errorf("fuzzy label query produced an empty result set\noutput:\n%s", s)
 	}
 }

@@ -19,6 +19,75 @@ func TestIssueQueryPlainTextMatchesIDAndTitle(t *testing.T) {
 	}
 }
 
+func TestIssueQueryPlainTextFuzzyMatchesSearchableContent(t *testing.T) {
+	externalRef := "https://github.com/example/project/issues/482"
+	issue := model.Issue{
+		ID:                 "bd-gewa",
+		Title:              "Clean global search",
+		Description:        "Restore callback delivery",
+		Design:             "Use one canonical matcher",
+		AcceptanceCriteria: "Labels remain discoverable",
+		Notes:              "Reported from the spectroscope workspace",
+		Status:             model.StatusInProgress,
+		Priority:           1,
+		IssueType:          model.TypeBug,
+		Assignee:           "andre",
+		Labels:             []string{"lane-attempt=1"},
+		SourceRepo:         "b9s",
+		ExternalRef:        &externalRef,
+		Comments: []*model.Comment{
+			{Author: "operator", Text: "Fuzzy matching should include comments"},
+		},
+	}
+
+	tests := map[string]string{
+		"description":         "clbdel",
+		"design":              "cnmtr",
+		"acceptance criteria": "lblrd",
+		"notes":               "spctrscp",
+		"status":              "inprg",
+		"priority":            "p1",
+		"type":                "bg",
+		"assignee":            "adr",
+		"label":               "lna1",
+		"project":             "b9",
+		"external reference":  "ghb482",
+		"comment author":      "optr",
+		"comment text":        "fzmtcmt",
+	}
+
+	for name, raw := range tests {
+		t.Run(name, func(t *testing.T) {
+			if query := ParseIssueQuery(raw); !query.Matches(issue) {
+				t.Errorf("plain query %q did not fuzzy-match %s", raw, name)
+			}
+		})
+	}
+}
+
+func TestIssueQueryFieldValuesMatchFuzzily(t *testing.T) {
+	issue := model.Issue{
+		Status:     model.StatusInProgress,
+		IssueType:  model.TypeFeature,
+		Labels:     []string{"lane-attempt=1"},
+		Assignee:   "andre",
+		SourceRepo: "spectroscope",
+	}
+
+	for _, raw := range []string{
+		"label:lane-a",
+		"label:lna1",
+		"status:inprg",
+		"type:ftr",
+		"assignee:adr",
+		"project:spctrscp",
+	} {
+		if query := ParseIssueQuery(raw); !query.Matches(issue) {
+			t.Errorf("field query %q did not fuzzy-match issue", raw)
+		}
+	}
+}
+
 func TestIssueQueryUsesORWithinFacetAndANDBetweenFacets(t *testing.T) {
 	query := ParseIssueQuery("status:open status:blocked type:epic")
 

@@ -546,9 +546,9 @@ type labelCount struct {
 // bodyHeight returns the available height for the main content area,
 // accounting for the picker header and footer (bd-ey3, bd-ylz, bd-2me).
 func (m Model) bodyHeight() int {
-	headerH := 1 // default: single-line global header when no projects
+	headerH := unifiedQueryBarHeight
 	if len(m.allProjects) > 0 && m.pickerVisible {
-		headerH = m.projectPicker.Height()
+		headerH += panelRows
 	}
 	h := m.height - headerH - 1 // -1 for footer
 	if h < 3 {
@@ -6281,60 +6281,47 @@ func (m Model) renderLabelBar() string {
 	return strings.Join(rows, "\n")
 }
 
-// renderUnifiedTitleBar renders the persistent query, filter, result, and sort summary.
+const unifiedQueryBarHeight = 3
+
+// renderUnifiedTitleBar renders the global fuzzy-search field.
 func (m Model) renderUnifiedTitleBar(w int) string {
 	t := m.theme
-	labelStyle := t.Renderer.NewStyle().Foreground(t.Primary).Bold(true)
-	queryStyle := t.Renderer.NewStyle().Foreground(lipgloss.Color("#F3F3F3")).Bold(true)
-	secondaryStyle := t.Renderer.NewStyle().Foreground(t.Secondary)
+	if w <= 0 {
+		w = 80
+	}
+	queryStyle := t.Renderer.NewStyle().Foreground(t.Base.GetForeground())
 
 	queryText := m.queryState.Text()
-	if queryText == "" {
-		queryText = "search ID, title, or field:value"
-	}
-	if m.queryState.Mode() == QueryEditing {
-		queryText += "█"
-	}
-
-	leftParts := []string{"WHERE / FILTER", "/ " + queryText}
-	if m.currentFilter != "" && m.currentFilter != "all" {
-		leftParts = append(leftParts, "[status:"+m.currentFilter+"]")
-	}
-	if m.labelFilter != "" {
-		leftParts = append(leftParts, "[label:"+m.labelFilter+"]")
-	}
-	if m.assigneeFilter != "" {
-		leftParts = append(leftParts, "[assignee:"+m.assigneeFilter+"]")
-	}
-	if m.allProjectsMode {
-		leftParts = append(leftParts, "[project:all]")
-	} else if m.activeProjectName != "" {
-		leftParts = append(leftParts, "[project:"+m.activeProjectName+"]")
-	}
-	leftParts = append(leftParts, fmt.Sprintf("%d/%d", len(m.list.Items()), len(m.issues)))
-
-	if m.queryState.Mode() == QueryEditing {
-		if candidates := m.queryCompletions(); len(candidates) > 0 && candidates[0] != m.queryState.Text() {
-			leftParts = append(leftParts, "⇥ "+candidates[0])
+	content := ""
+	if !m.pickerVisible {
+		if m.allProjectsMode {
+			content = "all projects  "
+		} else if m.activeProjectName != "" {
+			content = m.activeProjectName + "  "
 		}
 	}
-
-	right := fmt.Sprintf("ORDER BY  %s %s", m.tree.GetSortField().String(), m.tree.GetSortDirection().Indicator())
-	availableLeft := w - lipgloss.Width(right) - 3
-	if availableLeft < 12 {
-		availableLeft = 12
+	content += "/"
+	if queryText != "" {
+		content += " " + queryText
 	}
-	left := truncateRunesHelper(strings.Join(leftParts, "  "), availableLeft, "…")
-	padding := w - lipgloss.Width(left) - lipgloss.Width(right)
-	if padding < 1 {
-		padding = 1
+	if m.queryState.Mode() == QueryEditing {
+		content += "█"
 	}
-
-	styledLeft := queryStyle.Render(left)
-	if strings.HasPrefix(left, "WHERE / FILTER") {
-		styledLeft = labelStyle.Render("WHERE / FILTER") + queryStyle.Render(strings.TrimPrefix(left, "WHERE / FILTER"))
+	contentWidth := w - 4
+	if contentWidth < 1 {
+		contentWidth = 1
 	}
-	return styledLeft + strings.Repeat(" ", padding) + secondaryStyle.Render(right)
+	content = truncateRunesHelper(content, contentWidth, "…")
+	boxWidth := w - 2
+	if boxWidth < 1 {
+		boxWidth = 1
+	}
+	return t.Renderer.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(t.Open).
+		Padding(0, 1).
+		Width(boxWidth).
+		Render(queryStyle.Render(content))
 }
 
 // renderAssigneeBar renders the top bar in assignee mode, showing assignees with counts

@@ -294,13 +294,14 @@ In a project with thousands of issues, you cannot afford to wait for a backend q
 
 The root TUI model owns one query string and parses it into an immutable issue query before deriving view data. List, tree, and board therefore receive the same result set instead of implementing their own matching rules.
 
-Plain text searches ID and title. Structured predicates narrow a field explicitly:
+Plain text fuzzily searches all meaningful issue content: ID, title, description, design, acceptance criteria, notes, status, priority, type, assignee, labels, project, external reference, and comments. Structured predicates narrow the fuzzy match to one field:
 
-*   `id:sxgr` matches issue IDs containing `sxgr`.
+*   `id:sxgr` matches issue IDs fuzzily.
+*   `label:lane-a` matches a label such as `lane-attempt=1` without requiring the full value.
 *   `status:open status:blocked type:epic` matches open or blocked epics.
 *   `priority:p1 label:frontend assignee:steve` composes three facets.
 
-Positive values within one field use OR semantics. Different fields and negated predicates use AND semantics. Supported fields are ID, title, status, priority, type, label, assignee, and project.
+Positive values within one field use OR semantics. Different fields and negated predicates use AND semantics. Supported fields are ID, title, status, priority, type, label, assignee, and project. Priority predicates remain exact so `p1` does not match `p10`.
 
 ### Performance Characteristics
 *   **Client-Side Filtering:** Query evaluation uses already-loaded issues. There is no database latency or network round trip.

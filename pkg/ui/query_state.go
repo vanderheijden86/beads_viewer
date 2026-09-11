@@ -136,36 +136,73 @@ func predicateMatchesIssue(predicate issueQueryPredicate, issue model.Issue) boo
 	value := predicate.value
 	switch predicate.field {
 	case QueryFieldText:
-		return strings.Contains(strings.ToLower(issue.ID), value) ||
-			strings.Contains(strings.ToLower(issue.Title), value)
+		return issueMatchesFuzzyText(issue, value)
 	case QueryFieldID:
-		return strings.Contains(strings.ToLower(issue.ID), value)
+		return fuzzyTextMatch(issue.ID, value)
 	case QueryFieldTitle:
-		return strings.Contains(strings.ToLower(issue.Title), value)
+		return fuzzyTextMatch(issue.Title, value)
 	case QueryFieldStatus:
-		return strings.EqualFold(string(issue.Status), value)
+		return fuzzyTextMatch(string(issue.Status), value)
 	case QueryFieldPriority:
 		return fmt.Sprintf("%d", issue.Priority) == strings.TrimPrefix(value, "p")
 	case QueryFieldType:
-		return strings.EqualFold(string(issue.IssueType), value)
+		return fuzzyTextMatch(string(issue.IssueType), value)
 	case QueryFieldLabel:
 		for _, label := range issue.Labels {
-			if strings.EqualFold(label, value) {
+			if fuzzyTextMatch(label, value) {
 				return true
 			}
 		}
 		return false
 	case QueryFieldAssignee:
-		return strings.EqualFold(issue.Assignee, value)
+		return fuzzyTextMatch(issue.Assignee, value)
 	case QueryFieldProject:
 		project := issue.SourceRepo
 		if project == "" {
 			project = ExtractRepoPrefix(issue.ID)
 		}
-		return strings.EqualFold(project, value)
+		return fuzzyTextMatch(project, value)
 	default:
 		return false
 	}
+}
+
+func fuzzyTextMatch(candidate, query string) bool {
+	return query != "" && fuzzyScore(candidate, query) > 0
+}
+
+func issueMatchesFuzzyText(issue model.Issue, query string) bool {
+	values := []string{
+		issue.ID,
+		issue.Title,
+		issue.Description,
+		issue.Design,
+		issue.AcceptanceCriteria,
+		issue.Notes,
+		string(issue.Status),
+		fmt.Sprintf("p%d", issue.Priority),
+		string(issue.IssueType),
+		issue.Assignee,
+		issue.SourceRepo,
+	}
+	if issue.SourceRepo == "" {
+		values = append(values, ExtractRepoPrefix(issue.ID))
+	}
+	if issue.ExternalRef != nil {
+		values = append(values, *issue.ExternalRef)
+	}
+	values = append(values, issue.Labels...)
+	for _, comment := range issue.Comments {
+		if comment != nil {
+			values = append(values, comment.Author, comment.Text)
+		}
+	}
+	for _, candidate := range values {
+		if fuzzyTextMatch(candidate, query) {
+			return true
+		}
+	}
+	return false
 }
 
 // QueryState owns the editable text and its finite input lifecycle.

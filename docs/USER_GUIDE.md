@@ -35,7 +35,7 @@ No web page loads, no heavy clients. `bw` starts instantly and lets you fly thro
 Don't just read the title. `bw` gives you the full picture:
 *   **Comments & History:** Scroll through the full conversation history of any task.
 *   **Metadata:** Instantly see Assignees, Labels, Priority badges, and creation dates.
-*   **Search:** A shared query bar (`/`) finds issues by ID or title and composes structured fields such as status, type, priority, label, assignee, and project.
+*   **Search:** A shared query field (`/`) fuzzily searches all issue content and composes structured fields such as status, type, priority, label, assignee, and project.
 
 ### 🎯 Focused Workflows
 *   **Kanban Board:** Press `b` to switch to a columnar view (Open, In Progress, Blocked, Closed) to visualize flow.
@@ -2576,13 +2576,15 @@ bw has a comprehensive built-in help system:
 
 ### Search and filters compose
 
-Press `/` in the tree, list, or board to focus one shared **WHERE / FILTER** bar. Results update as you type, and the bar always shows the result count, active quick-filter chips, and current sort:
+Press `/` in the tree, list, or board to focus one shared search field. Results update as you type. The compact bordered input stays visually separate from project, filter, and sort controls:
 
 ```text
-WHERE / FILTER  / id:7rt1  [status:open]  [label:ui]  1/996     ORDER BY  Created ▼
+╭──────────────────────────────────────────────────────────────╮
+│ / lane-a█                                                    │
+╰──────────────────────────────────────────────────────────────╯
 ```
 
-Plain text searches both issue IDs and titles. Structured predicates target a field:
+Plain text fuzzily searches IDs, titles, descriptions, design notes, acceptance criteria, notes, status, priority, type, labels, assignees, projects, external references, and comments. Structured predicates constrain fuzzy matching to a field:
 
 | Predicate | Example |
 | :--- | :--- |
@@ -2600,7 +2602,7 @@ Press `Tab` to complete a partially typed field or a value found in the loaded i
 - **While the query bar is focused, every keystroke goes into the query.** Global shortcuts are suspended, so query characters never trigger actions. Press `Enter` to accept and keep the query visible. Press `Esc` while editing or after acceptance to clear it.
 - **The first result is revealed with surrounding context.** A distant tree result is placed near the upper third of the viewport instead of at the bottom edge. Use `n` / `N` to move through matches.
 - **Search results are scoped to the active label, assignee, and status filters**, so the match count and `n` / `N` navigation only cover issues you can actually see. Changing a filter while a query is active re-scopes the matches. In XRay mode (`x`), search is scoped to the drilled-down subtree.
-- **Quick filters stay visible as chips.** The `o`, `c`, `r`, and `a` status shortcuts and label/assignee selections are reflected in the same bar across all views.
+- **Quick filters continue to compose with search.** The `o`, `c`, `r`, and `a` status shortcuts and label/assignee selections narrow results without crowding the search input.
 
 ---
 

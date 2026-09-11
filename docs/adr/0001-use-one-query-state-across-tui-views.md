@@ -2,8 +2,9 @@
 type: ADR
 id: "0001"
 title: "Use one query state across TUI views"
-status: active
+status: superseded
 date: 2026-09-10
+superseded_by: "0002"
 ---
 
 ## Context
