@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/vanderheijden86/beadwork/internal/datasource"
 	"github.com/vanderheijden86/beadwork/pkg/config"
@@ -546,9 +547,14 @@ type labelCount struct {
 // bodyHeight returns the available height for the main content area,
 // accounting for the picker header and footer (bd-ey3, bd-ylz, bd-2me).
 func (m Model) bodyHeight() int {
-	headerH := unifiedQueryBarHeight
+	headerH := 0
 	if len(m.allProjects) > 0 && m.pickerVisible {
 		headerH += panelRows
+	}
+	if m.queryBarVisible() {
+		headerH += unifiedQueryBarHeight
+	} else if len(m.allProjects) > 0 && !m.pickerVisible {
+		headerH++
 	}
 	h := m.height - headerH - 1 // -1 for footer
 	if h < 3 {
@@ -2097,7 +2103,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.handleQueryKey(msg)
 			return m, tea.Batch(cmds...)
 		}
-		if msg.String() == "esc" && !m.queryState.Empty() {
+		if msg.String() == "esc" && m.queryState.Text() != "" {
 			m.queryState.Clear()
 			m.setQueryText("")
 			return m, tea.Batch(cmds...)
@@ -3608,8 +3614,12 @@ func (m Model) View() string {
 			}
 		}
 	} else {
-		// Collapsed: just the unified title bar
-		pickerHeader = titleBar
+		if titleBar != "" {
+			pickerHeader = titleBar
+		} else if len(m.allProjects) > 0 {
+			m.projectPicker.SetSize(m.width, m.height)
+			pickerHeader = m.projectPicker.ViewMinimized()
+		}
 	}
 
 	if pickerHeader != "" {
@@ -4703,13 +4713,33 @@ func (m Model) queryCompletions() []string {
 
 	if !strings.Contains(lookupToken, ":") {
 		fields := []string{"assignee:", "id:", "label:", "priority:", "project:", "status:", "title:", "type:"}
-		matches := make([]string, 0, len(fields))
+		matches := make(map[string]string)
+		addMatch := func(value string) {
+			if value == "" || !strings.HasPrefix(strings.ToLower(value), strings.ToLower(lookupToken)) {
+				return
+			}
+			matches[strings.ToLower(value)] = value
+		}
 		for _, field := range fields {
-			if strings.HasPrefix(field, strings.ToLower(lookupToken)) {
-				matches = append(matches, prefix+negation+field)
+			addMatch(field)
+		}
+		for _, issue := range m.issues {
+			for _, value := range issueSearchableValues(issue) {
+				for _, term := range queryCompletionTerms(value) {
+					addMatch(term)
+				}
 			}
 		}
-		return matches
+		keys := make([]string, 0, len(matches))
+		for key := range matches {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		completions := make([]string, 0, len(keys))
+		for _, key := range keys {
+			completions = append(completions, prefix+negation+matches[key])
+		}
+		return completions
 	}
 
 	parts := strings.SplitN(lookupToken, ":", 2)
@@ -4724,6 +4754,10 @@ func (m Model) queryCompletions() []string {
 		switch field {
 		case QueryFieldID:
 			add(issue.ID)
+		case QueryFieldTitle:
+			for _, term := range queryCompletionTerms(issue.Title) {
+				add(term)
+			}
 		case QueryFieldStatus:
 			add(string(issue.Status))
 		case QueryFieldPriority:
@@ -4755,6 +4789,12 @@ func (m Model) queryCompletions() []string {
 		completions = append(completions, prefix+negation+string(field)+":"+value)
 	}
 	return completions
+}
+
+func queryCompletionTerms(value string) []string {
+	return strings.FieldsFunc(value, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("-_.=@", r)
+	})
 }
 
 func (m *Model) filteredIssuesForActiveView() []model.Issue {
@@ -6181,7 +6221,9 @@ func (m Model) renderLabelBar() string {
 			}
 			rows = append(rows, clipStyle.Render(row))
 		}
-		rows = append(rows, m.renderUnifiedTitleBar(w))
+		if titleBar := m.renderUnifiedTitleBar(w); titleBar != "" {
+			rows = append(rows, titleBar)
+		}
 		return strings.Join(rows, "\n")
 	}
 
@@ -6319,14 +6361,25 @@ func (m Model) renderLabelBar() string {
 		}
 		rows = append(rows, clipStyle.Render(row))
 	}
-	rows = append(rows, m.renderUnifiedTitleBar(w))
+	if titleBar := m.renderUnifiedTitleBar(w); titleBar != "" {
+		rows = append(rows, titleBar)
+	}
 	return strings.Join(rows, "\n")
 }
 
 const unifiedQueryBarHeight = 3
 
+var unifiedQueryBorder = lipgloss.AdaptiveColor{Light: "#285B35", Dark: "#1F5E3B"}
+
+func (m Model) queryBarVisible() bool {
+	return m.queryState.Mode() == QueryEditing
+}
+
 // renderUnifiedTitleBar renders the global fuzzy-search field.
 func (m Model) renderUnifiedTitleBar(w int) string {
+	if !m.queryBarVisible() {
+		return ""
+	}
 	t := m.theme
 	if w <= 0 {
 		w = 80
@@ -6360,7 +6413,7 @@ func (m Model) renderUnifiedTitleBar(w int) string {
 	}
 	return t.Renderer.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(t.Open).
+		BorderForeground(unifiedQueryBorder).
 		Padding(0, 1).
 		Width(boxWidth).
 		Render(queryStyle.Render(content))
@@ -6435,7 +6488,9 @@ func (m Model) renderAssigneeBar() string {
 			}
 			rows = append(rows, clipStyle.Render(row))
 		}
-		rows = append(rows, m.renderUnifiedTitleBar(w))
+		if titleBar := m.renderUnifiedTitleBar(w); titleBar != "" {
+			rows = append(rows, titleBar)
+		}
 		return strings.Join(rows, "\n")
 	}
 
@@ -6566,6 +6621,8 @@ func (m Model) renderAssigneeBar() string {
 		}
 		rows = append(rows, clipStyle.Render(row))
 	}
-	rows = append(rows, m.renderUnifiedTitleBar(w))
+	if titleBar := m.renderUnifiedTitleBar(w); titleBar != "" {
+		rows = append(rows, titleBar)
+	}
 	return strings.Join(rows, "\n")
 }

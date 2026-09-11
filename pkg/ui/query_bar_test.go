@@ -39,6 +39,53 @@ func TestSlashStartsSharedQueryEditingInEveryView(t *testing.T) {
 	}
 }
 
+func TestQueryBarIsHiddenUntilSlashStartsEditing(t *testing.T) {
+	m := newSearchFilterModel(t, "")
+
+	if bar := m.renderUnifiedTitleBar(80); bar != "" {
+		t.Fatalf("idle query bar = %q, want hidden", stripANSI(bar))
+	}
+
+	m = typeKeys(m, "/")
+	if bar := m.renderUnifiedTitleBar(80); bar == "" {
+		t.Fatal("slash did not reveal the query bar")
+	}
+}
+
+func TestQueryBarHidesAfterAccept(t *testing.T) {
+	m := newSearchFilterModel(t, "")
+	m = typeKeys(m, "/", "l", "a", "n", "e")
+
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+
+	if bar := m.renderUnifiedTitleBar(80); bar != "" {
+		t.Fatalf("accepted query bar = %q, want hidden", stripANSI(bar))
+	}
+	if got := m.queryState.Text(); got != "lane" {
+		t.Fatalf("accepted query = %q, want lane", got)
+	}
+}
+
+func TestIdleLayoutDoesNotReserveSearchFieldRows(t *testing.T) {
+	m := newSearchFilterModel(t, "")
+	m.height = 40
+
+	idleHeight := m.bodyHeight()
+	m = typeKeys(m, "/")
+	editingHeight := m.bodyHeight()
+
+	if got := idleHeight - editingHeight; got != unifiedQueryBarHeight {
+		t.Fatalf("idle layout restores %d rows, want %d", got, unifiedQueryBarHeight)
+	}
+}
+
+func TestQueryBarUsesSubduedDarkGreenBorder(t *testing.T) {
+	if got := unifiedQueryBorder.Dark; got != "#1F5E3B" {
+		t.Fatalf("dark query border = %q, want subdued dark green", got)
+	}
+}
+
 func TestSharedQueryFiltersByIDAndPersistsAfterAccept(t *testing.T) {
 	m := newSearchFilterModel(t, "")
 	m = typeKeys(m, "/", "i", "d", ":", "b", "v", "-", "3")
@@ -65,9 +112,8 @@ func TestSharedQueryFiltersByIDAndPersistsAfterAccept(t *testing.T) {
 		t.Fatalf("accepted query = %q, want it to persist", got)
 	}
 
-	bar := stripANSI(m.renderUnifiedTitleBar(120))
-	if !strings.Contains(bar, "/ id:bv-3") {
-		t.Errorf("query bar %q does not contain the accepted search", bar)
+	if bar := m.renderUnifiedTitleBar(120); bar != "" {
+		t.Errorf("accepted query bar %q should be hidden", stripANSI(bar))
 	}
 }
 
@@ -88,6 +134,20 @@ func TestEscapeClearsAcceptedSharedQuery(t *testing.T) {
 	}
 	if got := m.tree.NodeCount(); got != 4 {
 		t.Fatalf("tree count after clearing = %d, want 4", got)
+	}
+}
+
+func TestEscapeClearsAcceptedEmptyFacetQuery(t *testing.T) {
+	m := newSearchFilterModel(t, "")
+	m = typeKeys(m, "/", "l", "a", "b", "e", "l", ":")
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(Model)
+
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(Model)
+
+	if got := m.queryState.Text(); got != "" {
+		t.Fatalf("escape left accepted empty facet text %q", got)
 	}
 }
 
@@ -113,6 +173,7 @@ func TestQueryBarKeepsSearchReadableWithLegacyFilters(t *testing.T) {
 	m.currentFilter = "open"
 	m.assigneeFilter = "ann"
 	m.setQueryText("id:bv")
+	m.queryState.StartEditing()
 
 	bar := stripANSI(m.renderUnifiedTitleBar(160))
 	if !strings.Contains(bar, "/ id:bv") {

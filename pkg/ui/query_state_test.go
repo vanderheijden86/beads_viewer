@@ -88,6 +88,87 @@ func TestIssueQueryFieldValuesMatchFuzzily(t *testing.T) {
 	}
 }
 
+func TestIssueQueryEmptyFieldValueMatchesEveryIssue(t *testing.T) {
+	query := ParseIssueQuery("label:")
+	issues := []model.Issue{
+		{ID: "with-label", Labels: []string{"lane-attempt=1"}},
+		{ID: "without-label"},
+	}
+
+	for _, issue := range issues {
+		if !query.Matches(issue) {
+			t.Errorf("empty label predicate excluded %q", issue.ID)
+		}
+	}
+}
+
+func TestIssueQueryPartialLabelShowsEveryMatchingIssue(t *testing.T) {
+	query := ParseIssueQuery("label:l")
+	issues := []model.Issue{
+		{ID: "lane", Labels: []string{"lane-attempt=1"}},
+		{ID: "loser", Labels: []string{"loser"}},
+		{ID: "lover", Labels: []string{"lover"}},
+		{ID: "other", Labels: []string{"backend"}},
+	}
+
+	for _, issue := range issues[:3] {
+		if !query.Matches(issue) {
+			t.Errorf("partial label query excluded %q", issue.ID)
+		}
+	}
+	if query.Matches(issues[3]) {
+		t.Errorf("partial label query included unrelated %q", issues[3].ID)
+	}
+}
+
+func TestModelPartialLabelQueryNarrowsResultsIncrementally(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "lane", Labels: []string{"lane-attempt=1"}},
+		{ID: "loser", Labels: []string{"loser"}},
+		{ID: "lover", Labels: []string{"lover"}},
+		{ID: "other", Labels: []string{"backend"}},
+	}
+	m := NewModel(issues, "")
+
+	m.setQueryText("label:")
+	if got := len(m.list.Items()); got != 4 {
+		t.Fatalf("empty label facet shows %d issues, want 4", got)
+	}
+
+	m.setQueryText("label:l")
+	if got := len(m.list.Items()); got != 3 {
+		t.Fatalf("partial label facet shows %d issues, want 3", got)
+	}
+}
+
+func TestQueryTabCompletesPlainLabelAndSearchTerms(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "issue-1", Title: "Deploy dispatcher", Labels: []string{"lane-attempt=1"}},
+	}
+
+	for _, test := range []struct {
+		name string
+		text string
+		want string
+	}{
+		{name: "label", text: "lan", want: "lane-attempt=1"},
+		{name: "structured label", text: "label:lan", want: "label:lane-attempt=1"},
+		{name: "search term", text: "dep", want: "Deploy"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			m := NewModel(issues, "")
+			m.queryState.StartEditing()
+			m.setQueryText(test.text)
+
+			m.completeQuery()
+
+			if got := m.queryState.Text(); got != test.want {
+				t.Fatalf("completion for %q = %q, want %q", test.text, got, test.want)
+			}
+		})
+	}
+}
+
 func TestIssueQueryUsesORWithinFacetAndANDBetweenFacets(t *testing.T) {
 	query := ParseIssueQuery("status:open status:blocked type:epic")
 

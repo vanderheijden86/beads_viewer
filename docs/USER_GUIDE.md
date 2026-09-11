@@ -2578,7 +2578,7 @@ bw has a comprehensive built-in help system:
 
 ### Search and filters compose
 
-Press `/` in the tree, list, or board to focus one shared search field. Results update as you type. The compact bordered input stays visually separate from project, filter, and sort controls:
+Press `/` in the tree, list, or board to reveal and focus one shared search field. It stays hidden when idle and returns its rows to the task view. Results update as you type, and the compact dark-green bordered input stays visually separate from project, filter, and sort controls:
 
 ```text
 ╭──────────────────────────────────────────────────────────────╮
@@ -2599,9 +2599,10 @@ Plain text fuzzily searches IDs, titles, descriptions, design notes, acceptance 
 | Assignee | `assignee:andre` |
 | Project | `project:b9s` |
 
-Press `Tab` to complete a partially typed field or a value found in the loaded issues. Multiple values for the same field are alternatives, while different fields compose with AND. Prefix a predicate with `!` to exclude it, for example `status:open !label:blocked`.
+Press `Tab` to complete a partially typed field, label, or ordinary search term found in the loaded issues. Multiple values for the same field are alternatives, while different fields compose with AND. Prefix a predicate with `!` to exclude it, for example `status:open !label:blocked`.
 
-- **While the query bar is focused, every keystroke goes into the query.** Global shortcuts are suspended, so query characters never trigger actions. Press `Enter` to accept and keep the query visible. Press `Esc` while editing or after acceptance to clear it.
+- **While the query bar is focused, every keystroke goes into the query.** Global shortcuts are suspended, so query characters never trigger actions. Press `Enter` to accept the query and hide the field; press `/` to edit it again. Press `Esc` while editing or after acceptance to clear it.
+- **Incomplete predicates remain permissive.** `label:` shows every issue. Typing `label:l` then narrows the list live to issues with matching labels such as `lane`, `loser`, and `lover`.
 - **The first result is revealed with surrounding context.** A distant tree result is placed near the upper third of the viewport instead of at the bottom edge. Use `n` / `N` to move through matches.
 - **Search results are scoped to the active label, assignee, and status filters**, so the match count and `n` / `N` navigation only cover issues you can actually see. Changing a filter while a query is active re-scopes the matches. In XRay mode (`x`), search is scoped to the drilled-down subtree.
 - **Quick filters continue to compose with search.** The `o`, `c`, `r`, and `a` status shortcuts and label/assignee selections narrow results without crowding the search input.

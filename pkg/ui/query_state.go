@@ -60,9 +60,13 @@ func ParseIssueQuery(raw string) IssueQuery {
 		}
 
 		if separator := strings.IndexRune(token, ':'); separator > 0 {
+			value := strings.ToLower(token[separator+1:])
+			if value == "" {
+				continue
+			}
 			predicates = append(predicates, issueQueryPredicate{
 				field:   QueryField(strings.ToLower(token[:separator])),
-				value:   strings.ToLower(token[separator+1:]),
+				value:   value,
 				negated: negated,
 			})
 			continue
@@ -172,6 +176,15 @@ func fuzzyTextMatch(candidate, query string) bool {
 }
 
 func issueMatchesFuzzyText(issue model.Issue, query string) bool {
+	for _, candidate := range issueSearchableValues(issue) {
+		if fuzzyTextMatch(candidate, query) {
+			return true
+		}
+	}
+	return false
+}
+
+func issueSearchableValues(issue model.Issue) []string {
 	values := []string{
 		issue.ID,
 		issue.Title,
@@ -197,12 +210,7 @@ func issueMatchesFuzzyText(issue model.Issue, query string) bool {
 			values = append(values, comment.Author, comment.Text)
 		}
 	}
-	for _, candidate := range values {
-		if fuzzyTextMatch(candidate, query) {
-			return true
-		}
-	}
-	return false
+	return values
 }
 
 // QueryState owns the editable text and its finite input lifecycle.

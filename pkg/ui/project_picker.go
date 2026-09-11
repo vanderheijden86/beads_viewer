@@ -37,17 +37,17 @@ type ToggleFavoriteMsg struct {
 // It renders as a multi-column panel: project table (# NAME O P R) | shortcuts | B9s logo.
 // Project switching is done via number keys 1-9 or filter mode.
 type ProjectPickerModel struct {
-	entries      []ProjectEntry
-	filtered     []int // indices into entries
-	cursor       int   // only used during filter mode for selecting results
-	scrollOffset int   // index of the first visible project row (normal mode scrolling, bd-i8t3)
-	width        int
-	height       int
-	filterInput  textinput.Model
-	filtering    bool
-	theme            Theme
-	sourceInfo       string // e.g. "dolt://osen.co:3306/b9s ✓" or "jsonl .beads/issues.jsonl"
-	allProjectsMode  bool   // True when showing all-projects view (bd-g68w)
+	entries         []ProjectEntry
+	filtered        []int // indices into entries
+	cursor          int   // only used during filter mode for selecting results
+	scrollOffset    int   // index of the first visible project row (normal mode scrolling, bd-i8t3)
+	width           int
+	height          int
+	filterInput     textinput.Model
+	filtering       bool
+	theme           Theme
+	sourceInfo      string // e.g. "dolt://osen.co:3306/b9s ✓" or "jsonl .beads/issues.jsonl"
+	allProjectsMode bool   // True when showing all-projects view (bd-g68w)
 }
 
 // maxVisibleProjects is the max number of projects shown in the table.
@@ -470,7 +470,9 @@ func (m *ProjectPickerModel) ViewWithTitleBar(titleBar string) string {
 		rows = append(rows, row)
 	}
 
-	rows = append(rows, titleBar)
+	if titleBar != "" {
+		rows = append(rows, titleBar)
+	}
 	return strings.Join(rows, "\n")
 }
 
@@ -817,7 +819,6 @@ func safeIndex(lines []string, i int) string {
 	}
 	return ""
 }
-
 
 // Filtering returns whether the picker is in filter mode.
 func (m *ProjectPickerModel) Filtering() bool {

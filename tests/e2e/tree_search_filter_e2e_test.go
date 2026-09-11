@@ -28,6 +28,71 @@ func makeLabelSearchFixture(t *testing.T) []treeFixtureIssue {
 	}
 }
 
+func TestSearchFieldHiddenUntilSlashE2E(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTreeFixture(t, tempDir, makeLabelSearchFixture(t))
+
+	idleOut, err := runTreeTUI(t, tempDir, 1200, nil)
+	if err != nil {
+		t.Fatalf("idle TUI run failed: %v\noutput:\n%s", err, idleOut)
+	}
+	if strings.Contains(string(idleOut), "/█") {
+		t.Fatalf("idle TUI rendered the search field\noutput:\n%s", idleOut)
+	}
+
+	editingOut, err := runTreeTUI(t, tempDir, 1500, []keyStep{kd("/", 150*time.Millisecond)})
+	if err != nil {
+		t.Fatalf("editing TUI run failed: %v\noutput:\n%s", err, editingOut)
+	}
+	if !strings.Contains(string(editingOut), "/█") {
+		t.Fatalf("slash did not reveal the search field\noutput:\n%s", editingOut)
+	}
+}
+
+func TestSearchTabCompletesPlainLabelE2E(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTreeFixture(t, tempDir, []treeFixtureIssue{
+		{ID: "dispatch-1", Title: "Dispatch", Status: "open", Priority: 1, IssueType: "task", CreatedAt: time.Now().Format(time.RFC3339), Labels: []string{"lane-attempt=1"}},
+	})
+
+	out, err := runTreeTUI(t, tempDir, 2200, []keyStep{
+		kd("/", 150*time.Millisecond),
+		kd("l", 80*time.Millisecond),
+		kd("a", 80*time.Millisecond),
+		kd("n", 80*time.Millisecond),
+		kd("\t", 100*time.Millisecond),
+	})
+	if err != nil {
+		t.Fatalf("completion TUI run failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "/ lane-attempt=1█") {
+		t.Fatalf("Tab did not complete the plain label\noutput:\n%s", out)
+	}
+}
+
+func TestEmptyLabelFacetKeepsResultsE2E(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTreeFixture(t, tempDir, makeLabelSearchFixture(t))
+
+	out, err := runTreeTUI(t, tempDir, 2200, []keyStep{
+		kd("/", 150*time.Millisecond),
+		kd("l", 60*time.Millisecond),
+		kd("a", 60*time.Millisecond),
+		kd("b", 60*time.Millisecond),
+		kd("e", 60*time.Millisecond),
+		kd("l", 60*time.Millisecond),
+		kd(":", 60*time.Millisecond),
+		kd("\r", 100*time.Millisecond),
+		kd("K", 100*time.Millisecond),
+	})
+	if err != nil {
+		t.Fatalf("empty-facet TUI run failed: %v\noutput:\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "Close issue?") {
+		t.Fatalf("empty label facet removed every selectable issue\noutput:\n%s", out)
+	}
+}
+
 // TestTreeSearchKeepsLabelFilterE2E drives the real TUI through a composed
 // label filter and free-text query.
 func TestTreeSearchKeepsLabelFilterE2E(t *testing.T) {

@@ -303,6 +303,8 @@ Plain text fuzzily searches all meaningful issue content: ID, title, description
 
 Positive values within one field use OR semantics. Different fields and negated predicates use AND semantics. Supported fields are ID, title, status, priority, type, label, assignee, and project. Priority predicates remain exact so `p1` does not match `p10`.
 
+An incomplete structured token such as `label:` adds no constraint, so live results remain visible until a value is typed. `Tab` completion draws field names, structured values, labels, and searchable terms from the currently loaded issues. The bordered query field is rendered only while its finite state is `editing`.
+
 ### Performance Characteristics
 *   **Client-Side Filtering:** Query evaluation uses already-loaded issues. There is no database latency or network round trip.
 *   **Stable Sort:** Query results maintain the active view's ordering.
