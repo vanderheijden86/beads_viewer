@@ -885,11 +885,10 @@ func defaultTutorialPages() []TutorialPage {
 			Content:  viewsBoardContent,
 		},
 		{
-			ID:       "views-graph",
-			Title:    "Graph View",
-			Section:  "Views",
-			Contexts: []string{"graph"},
-			Content:  viewsGraphContent,
+			ID:      "views-graph",
+			Title:   "Dependency Graph Export",
+			Section: "Views",
+			Content: viewsGraphExportContent,
 		},
 		{
 			ID:       "views-insights",
@@ -1135,7 +1134,6 @@ You're already running ` + "`bv`" + ` — you're ahead of the game!
 |-----|------|
 | **Esc** | Return to List |
 | **b** | Board (Kanban) |
-| **g** | Graph (dependencies) |
 | **i** | Insights panel |
 | **h** | History |
 
@@ -1423,27 +1421,10 @@ but the concept is simple: work flows in one direction, with no cycles.
 3. **High fan-out** — Completing this unblocks many items
 4. **Critical path** — The longest chain determines minimum time
 
-### Graph View (Press g)
+### Inspecting the Graph
 
-The **Graph view** visualizes these relationships:
-
-| Visual | Meaning |
-|--------|---------|
-| Node size | Priority (bigger = higher) |
-| Green node | Closed |
-| Blue node | In progress |
-| Red node | Blocked |
-| Arrow A→B | A blocks B |
-
-### Navigation in Graph View
-
-| Key | Action |
-|-----|--------|
-| **j/k** | Move between nodes vertically |
-| **h/l** | Move between siblings |
-| **f** | Focus on selected subgraph |
-| **Enter** | View selected issue |
-| **Esc** | Return to list |
+Use ` + "`bv --robot-graph`" + ` for dependency graph data or
+` + "`br dep list ID`" + ` for one issue's dependencies.
 
 ### Why This Matters
 
@@ -1665,50 +1646,14 @@ Press **b** to switch to the Kanban-style board.
 
 > Press **→** to continue.`
 
-// viewsGraphContent is the Graph View page content.
-const viewsGraphContent = `## Graph View
+const viewsGraphExportContent = `## Dependency Graph Export
 
-Press **g** to visualize issue dependencies as a graph.
+The interactive graph view is not currently available. Use the robot output when
+you need the complete dependency structure:
 
-` + "```" + `
-                    ┌─────────┐
-                    │ bv-abc1 │
-                    └────┬────┘
-                         │
-              ┌──────────┼──────────┐
-              ▼          ▼          ▼
-         ┌─────────┐ ┌─────────┐ ┌─────────┐
-         │ bv-def2 │ │ bv-ghi3 │ │ bv-jkl4 │
-         └────┬────┘ └─────────┘ └────┬────┘
-              │                       │
-              ▼                       ▼
-         ┌─────────┐            ┌─────────┐
-         │ bv-mno5 │            │ bv-pqr6 │
-         └─────────┘            └─────────┘
-` + "```" + `
+` + "```bash\nbv --robot-graph\nbv --robot-graph --graph-format=dot\nbv --export-graph dependency-graph.html\n```" + `
 
-### Reading the Graph
-
-- **Arrows point TO dependencies** (A → B means A *blocks* B)
-- **Node size** reflects priority
-- **Color** indicates status (green=closed, blue=in_progress, etc.)
-- **Highlighted node** is your current selection
-
-### Graph Navigation
-
-| Key | Action |
-|-----|--------|
-| **j/k** | Navigate between connected nodes |
-| **h/l** | Navigate siblings |
-| **Enter** | Select node and view details |
-| **f** | Focus: show only this node's subgraph |
-| **Esc** | Exit focus / return to list |
-
-### When to Use Graph View
-
-- **Critical path analysis**: Find what's blocking important work
-- **Dependency planning**: Understand execution order
-- **Impact assessment**: See what closing an issue unblocks
+Use ` + "`br dep list ID`" + ` when you only need the dependencies of one issue.
 
 > Press **→** to continue.`
 
@@ -2058,7 +2003,7 @@ Issues can depend on issues in other repos:
 
 ` + "```bash\nbr dep add fe-abc1 be-def2   # Frontend blocked by backend\n```" + `
 
-The graph view shows these cross-repo relationships.
+Use the robot graph export to inspect these cross-repo relationships.
 
 ### Filtering by Repo
 
@@ -2226,7 +2171,7 @@ Or in bv: press **r** to filter to ready issues.
 ` + "```" + `
 j/k   Navigate to the feature
 Enter View full details
-g     See dependency graph
+br dep list ID   Review dependencies
 ` + "```" + `
 
 Check: Is anything blocking this? Are there related tasks?
@@ -2254,7 +2199,7 @@ As you work, you realize there are sub-tasks:
 ### Pro Tips
 
 - **Check ` + "`br ready`" + `** after each close — new work may have unblocked
-- **Use ` + "`g`" + ` (graph view)** to visualize the sub-task structure
+- **Use ` + "`bv --robot-graph`" + `** to inspect the sub-task structure
 - **Set realistic priorities** — P2 for standard work, P1 only for blockers
 
 > Press **→** to continue.`
@@ -2358,7 +2303,7 @@ Open the Insights panel with **i**:
 
 ### Step 2: Identify Dependencies
 
-Press **g** for the graph view to see the dependency structure:
+Run ` + "`bv --robot-graph`" + ` to inspect the dependency structure:
 
 - **Tall chains** = sequential work (can't parallelize)
 - **Wide clusters** = parallel opportunities
@@ -2447,7 +2392,7 @@ Guide them through:
 
 1. **Find the issue**: Use filters (o/r) and search (/)
 2. **Review details**: Press Enter to see full description
-3. **Check dependencies**: Press g for graph view
+3. **Check dependencies**: Run ` + "`br dep list ID`" + `
 4. **Claim it**: ` + "`br update ID --status=in_progress`" + `
 5. **Do the work**: Regular development process
 6. **Close it**: ` + "`br close ID`" + `

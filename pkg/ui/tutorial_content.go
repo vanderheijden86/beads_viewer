@@ -112,7 +112,6 @@ func structuredTutorialPages() []StructuredTutorialPage {
 				Section{Title: "Switching Views"},
 				KeyTable{Bindings: []KeyBinding{
 					{Key: "b", Desc: "Board (Kanban)"},
-					{Key: "g", Desc: "Graph (dependencies)"},
 					{Key: "i", Desc: "Insights panel"},
 					{Key: "h", Desc: "History"},
 				}},
@@ -451,36 +450,16 @@ func structuredTutorialPages() []StructuredTutorialPage {
 			},
 		},
 		{
-			ID:       "views-graph",
-			Title:    "Graph View",
-			Section:  "Views",
-			Contexts: []string{"graph"},
+			ID:      "views-graph",
+			Title:   "Dependency Graph Export",
+			Section: "Views",
 			Elements: []TutorialElement{
-				Section{Title: "Visualize dependencies"},
-				Paragraph{Text: "Press g to see issues as a dependency graph."},
+				Section{Title: "Inspect dependency structure"},
+				Paragraph{Text: "The interactive graph view is not currently available."},
 				Spacer{Lines: 1},
-				Section{Title: "Reading the Graph"},
-				Bullet{Items: []string{
-					"Arrows point TO what's blocked (A->B = A blocks B)",
-					"Node size reflects priority",
-					"Color indicates status",
-					"Highlighted node is your selection",
-				}},
+				Code{Text: "bv --robot-graph\nbv --export-graph dependency-graph.html"},
 				Spacer{Lines: 1},
-				Section{Title: "Navigation"},
-				KeyTable{Bindings: []KeyBinding{
-					{Key: "j / k", Desc: "Navigate between nodes"},
-					{Key: "h / l", Desc: "Navigate siblings"},
-					{Key: "f", Desc: "Focus on subgraph"},
-					{Key: "Enter", Desc: "View selected issue"},
-				}},
-				Spacer{Lines: 1},
-				Section{Title: "Use Cases"},
-				Bullet{Items: []string{
-					"Critical path analysis",
-					"Dependency planning",
-					"Impact assessment",
-				}},
+				Tip{Text: "Use br dep list ID for one issue's dependencies"},
 			},
 		},
 		{
@@ -685,7 +664,7 @@ func structuredTutorialPages() []StructuredTutorialPage {
 				}},
 				Spacer{Lines: 1},
 				Section{Title: "Cross-Repo Dependencies"},
-				Paragraph{Text: "Issues can depend on issues in other repos. The graph shows these relationships."},
+				Paragraph{Text: "Issues can depend on issues in other repos. Use bv --robot-graph to inspect these relationships."},
 			},
 		},
 		{
@@ -758,7 +737,7 @@ func structuredTutorialPages() []StructuredTutorialPage {
 				Section{Title: "Step 2: Review & Claim"},
 				Bullet{Items: []string{
 					"Enter: View full details",
-					"g: See dependency graph",
+					"br dep list ID: Review dependencies",
 					"br update ID --status=in_progress",
 				}},
 				Spacer{Lines: 1},
@@ -815,7 +794,7 @@ func structuredTutorialPages() []StructuredTutorialPage {
 				Paragraph{Text: "Press i for Insights panel. Check open/blocked counts and top blockers."},
 				Spacer{Lines: 1},
 				Section{Title: "Step 2: Identify Dependencies"},
-				Paragraph{Text: "Press g for graph view:"},
+				Paragraph{Text: "Use bv --robot-graph to inspect dependency structure:"},
 				Bullet{Items: []string{
 					"Tall chains = sequential (can't parallelize)",
 					"Wide clusters = parallel opportunities",
@@ -856,7 +835,7 @@ func structuredTutorialPages() []StructuredTutorialPage {
 				Section{Title: "Step 4: Walk Through Workflow"},
 				Bullet{Items: []string{
 					"Find: filters (o/r) and search (/)",
-					"Review: Enter for details, g for graph",
+					"Review: Enter for details, br dep list ID for dependencies",
 					"Claim: br update ID --status=in_progress",
 					"Complete: br close ID && br sync",
 				}},

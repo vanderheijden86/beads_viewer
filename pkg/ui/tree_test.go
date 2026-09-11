@@ -4250,6 +4250,65 @@ func TestTreeNode_ShortIDAtEnd(t *testing.T) {
 	}
 }
 
+func TestTreeViewRendersLaneStageColumn(t *testing.T) {
+	issues := []model.Issue{
+		{
+			ID:        "agents-config-eg0.1.1",
+			Title:     "Blocked lane task",
+			Status:    model.StatusOpen,
+			IssueType: model.TypeTask,
+			Priority:  1,
+			CreatedAt: time.Now(),
+			Labels:    []string{"lane-queue=default", "lane-stage=BLOCKED"},
+		},
+	}
+	tree := NewTreeModel(newTreeTestTheme())
+	tree.Build(issues)
+	tree.SetSize(140, 20)
+
+	view := stripANSI(tree.View())
+	if !strings.Contains(view, "LANE") {
+		t.Fatalf("tree header missing lane column: %q", view)
+	}
+	if !strings.Contains(view, "BLOCKED") {
+		t.Fatalf("tree row missing dispatcher lane stage: %q", view)
+	}
+}
+
+func TestTreeViewRendersLaneStageAtMinimumColumnWidth(t *testing.T) {
+	issues := []model.Issue{
+		{
+			ID:        "bd-lane",
+			Title:     "Lane threshold test",
+			Status:    model.StatusOpen,
+			IssueType: model.TypeTask,
+			CreatedAt: time.Now(),
+			Labels:    []string{"lane-stage=RUNNING"},
+		},
+	}
+	tree := NewTreeModel(newTreeTestTheme())
+	tree.Build(issues)
+	tree.SetSize(100, 20)
+
+	view := stripANSI(tree.View())
+	if !strings.Contains(view, "LANE STATE") || !strings.Contains(view, "RUNNING") {
+		t.Fatalf("lane header and row must use the same width threshold: %q", view)
+	}
+	lines := strings.Split(view, "\n")
+	if got, want := strings.Index(lines[1], "RUNNING"), strings.Index(lines[0], "LANE STATE"); got != want {
+		t.Fatalf("lane state must align with its header: header column=%d row column=%d\n%s", want, got, view)
+	}
+}
+
+func TestHelpOverlayOmitsUnavailableGraphView(t *testing.T) {
+	m := NewModel(nil, "")
+	help := stripANSI(m.renderHelpOverlay())
+
+	if strings.Contains(help, "Graph view") || strings.Contains(help, "Graph View") {
+		t.Fatalf("help advertises unavailable graph view: %q", help)
+	}
+}
+
 func TestTreeHeaderIDAlignedWithRowIDStart(t *testing.T) {
 	issues := []model.Issue{
 		{ID: "agents-config-7w79", Title: "Header alignment test", Status: "open", IssueType: model.TypeTask, Priority: 2, CreatedAt: time.Now()},

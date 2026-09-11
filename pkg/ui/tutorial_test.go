@@ -707,6 +707,16 @@ func TestTutorialMarkdownWithTables(t *testing.T) {
 	}
 }
 
+func TestTutorialOmitsUnavailableGraphShortcut(t *testing.T) {
+	for _, page := range defaultTutorialPages() {
+		if strings.Contains(page.Content, "Press **g** to visualize") ||
+			strings.Contains(page.Content, "Press g for graph view") ||
+			strings.Contains(page.Content, "| **g** | Graph (dependencies) |") {
+			t.Fatalf("tutorial page %q advertises the unavailable graph shortcut", page.ID)
+		}
+	}
+}
+
 // Tests for Keyboard Navigation (bv-wdsd)
 
 func TestTutorialExitKeys(t *testing.T) {

@@ -1310,7 +1310,7 @@ func (t *TreeModel) renderEmptyState() string {
 
 // RenderHeader returns a styled header row for the tree view, with column
 // labels aligned to match the row content below (bd-xhyo, bd-y0ct).
-// Row layout: [gutter 2] [expand 1] [space 1] [icon 1] [space 1] [status 4] [space 1] [title...] ... [age 12] [space 2] [ID maxW]
+// Row layout: [gutter 2] [expand 1] [space 1] [icon 1] [space 1] [status 4] [space 1] [title...] ... [lane 12] [space 2] [age 12] [space 2] [ID maxW]
 func (t *TreeModel) RenderHeader() string {
 	width := t.width
 	if width <= 0 {
@@ -1362,9 +1362,15 @@ func (t *TreeModel) RenderHeader() string {
 		}
 	}
 
-	// Right side matches row: age(12) + gap(2) + ID(maxIDWidth)
-	// Left-align sort badge in the 12-char age column, left-align ID in its column
-	rightSide := fmt.Sprintf("%-12s  %-*s", sortBadge, maxIDWidth, "ID")
+	// Right side matches the row. The dispatcher-owned lane stage gets its own
+	// column on layouts wide enough to keep the issue title useful.
+	rightParts := make([]string, 0, 3)
+	if showLaneStageColumn(width) {
+		rightParts = append(rightParts, fmt.Sprintf("%12s", "LANE STATE"))
+	}
+	rightParts = append(rightParts, fmt.Sprintf("%-12s", sortBadge))
+	rightParts = append(rightParts, fmt.Sprintf("%-*s", maxIDWidth, "ID"))
+	rightSide := strings.Join(rightParts, "  ")
 	rightWidth := lipgloss.Width(rightSide)
 
 	// Fill space between "Issue" label and right columns.
@@ -1419,6 +1425,7 @@ func (t *TreeModel) renderNode(node *IssueTreeNode, isSelected bool, maxIDWidth 
 	if width <= 0 {
 		width = 80
 	}
+	showLaneStage := showLaneStageColumn(width)
 	// Reduce width by 1 to prevent terminal wrapping on the exact edge,
 	// and by selectionGutterWidth so all rows (selected and non-selected)
 	// render at the same content width — the gutter is filled by the
@@ -1428,17 +1435,14 @@ func (t *TreeModel) renderNode(node *IssueTreeNode, isSelected bool, maxIDWidth 
 	var leftSide strings.Builder
 
 	// ── Mark indicator (bd-cz0) ──
-	markWidth := 0
 	if t.IsMarked(issue.ID) {
 		markStyle := r.NewStyle().Foreground(t.theme.Highlight).Bold(true)
 		leftSide.WriteString(markStyle.Render("●"))
-		markWidth = 1
 	}
 
 	// ── Tree prefix (indentation + branch characters) ──
 	prefix := t.buildTreePrefix(node)
 	leftSide.WriteString(prefix)
-	prefixWidth := lipgloss.Width(prefix) + markWidth
 
 	// ── Expand/collapse indicator ──
 	indicator := t.getExpandIndicator(node)
@@ -1451,23 +1455,31 @@ func (t *TreeModel) renderNode(node *IssueTreeNode, isSelected bool, maxIDWidth 
 	typeIconStyle := r.NewStyle().Foreground(typeIconColor)
 	leftSide.WriteString(typeIconStyle.Render(typeIcon))
 	leftSide.WriteString(" ")
-	typeIconWidth := lipgloss.Width(typeIcon) + 1
 
 	// ── Status badge (polished, matching delegate) ──
 	statusBadge := RenderStatusBadge(string(issue.Status))
-	statusBadgeWidth := lipgloss.Width(statusBadge)
 	leftSide.WriteString(statusBadge)
 	leftSide.WriteString(" ")
 
 	// ── Calculate fixed widths (ID moved to right side, bd-03l) ──
-	// prefix + indicator(1) + space(1) + typeIcon + status(measured) + space(1)
-	fixedWidth := prefixWidth + 1 + 1 + typeIconWidth + statusBadgeWidth + 1
+	// Measure the rendered prefix so multi-width icons and styled badges cannot
+	// shift the right-side columns when the layout is tight.
+	fixedWidth := lipgloss.Width(leftSide.String())
 
-	// ── Right side: age + short ID (bd-03l) ──
+	// ── Right side: lane stage + age + short ID (bd-03l) ──
 	// Use dark text when selected (highlight background needs contrast, bd-hdgh)
 	rightWidth := 0
 	var rightParts []string
 	darkFg := lipgloss.AdaptiveColor{Light: "#000000", Dark: "#1A1A1A"}
+	if showLaneStage {
+		stage := truncateRunesHelper(dispatcherLaneStage(issue.Labels), 12, "…")
+		stageStyle := t.theme.SecondaryText
+		if isSelected {
+			stageStyle = r.NewStyle().Foreground(darkFg)
+		}
+		rightParts = append(rightParts, stageStyle.Render(fmt.Sprintf("%-12s", stage)))
+		rightWidth += 14 // 12 lane stage + 2 gap before age
+	}
 
 	if width > 60 {
 		ageStr := FormatTimeRel(issue.CreatedAt)
@@ -1574,6 +1586,20 @@ func (t *TreeModel) renderNode(node *IssueTreeNode, isSelected bool, maxIDWidth 
 	row = rowStyle.Render(row)
 
 	return row
+}
+
+func showLaneStageColumn(width int) bool {
+	return width >= 100
+}
+
+func dispatcherLaneStage(labels []string) string {
+	const prefix = "lane-stage="
+	for _, label := range labels {
+		if strings.HasPrefix(label, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(label, prefix))
+		}
+	}
+	return ""
 }
 
 // buildTreePrefix builds the indentation and branch characters for a node.

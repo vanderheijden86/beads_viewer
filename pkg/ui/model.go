@@ -4193,7 +4193,6 @@ func (m *Model) renderHelpOverlay() string {
 	viewsSection := []struct{ key, desc string }{
 		{"E", "Tree view"},
 		{"b", "Kanban board"},
-		{"g", "Graph view"},
 		{"i", "Insights"},
 		{"h", "History view"},
 		{"a", "Actionable"},
@@ -4223,13 +4222,6 @@ func (m *Model) renderHelpOverlay() string {
 		{"l", "Filter by label"},
 		{"s", "Cycle sort"},
 		{"S", "Triage sort"},
-	}
-
-	graphSection := []struct{ key, desc string }{
-		{"hjkl", "Navigate nodes"},
-		{"H/L", "Scroll left/right"},
-		{"PgUp/Dn", "Scroll up/down"},
-		{"Enter", "Jump to issue"},
 	}
 
 	insightsSection := []struct{ key, desc string }{
@@ -4303,17 +4295,13 @@ func (m *Model) renderHelpOverlay() string {
 		{"polling", "Live reload uses polling"},
 	}
 
-	// Build panels - ordered for balanced 3-column layout (4-4-2 split)
-	// Col 1: Nav(8)+Views(9)+Global(7)+History(5) = 29
-	// Col 2: Tree(9)+Graph(4)+Insights(6)+Status(7) = 26
-	// Col 3: Filters(10)+Actions(8) = 18
+	// Build panels in an order that stays balanced across responsive columns.
 	panels := []string{
 		renderPanel("Navigation", "🧭", 0, navSection),
 		renderPanel("Views", "👁", 1, viewsSection),
 		renderPanel("Global", "🌐", 2, globalSection),
 		renderPanel("History", "📜", 3, historySection),
 		renderPanel("Tree View", "🌳", 4, treeSection),
-		renderPanel("Graph View", "📊", 5, graphSection),
 		renderPanel("Insights", "💡", 0, insightsSection),
 		renderPanel("Status", "🩺", 2, statusSection),
 		renderPanel("Filters & Sort", "🔍", 3, filterSection),
