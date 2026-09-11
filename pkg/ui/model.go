@@ -2699,6 +2699,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case tea.MouseMsg:
+		m = m.handleMouseWheel(msg)
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -2787,6 +2791,44 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleMouseWheel(msg tea.MouseMsg) Model {
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		switch m.focused {
+		case focusTree:
+			m.tree.MoveUp()
+			m.syncTreeToDetail()
+		case focusBoard:
+			m.board.MoveUp()
+			m.syncBoardToDetail()
+		case focusList:
+			if m.list.Index() > 0 {
+				m.list.Select(m.list.Index() - 1)
+				m.updateViewportContent()
+			}
+		case focusDetail:
+			m.viewport.LineUp(3)
+		}
+	case tea.MouseButtonWheelDown:
+		switch m.focused {
+		case focusTree:
+			m.tree.MoveDown()
+			m.syncTreeToDetail()
+		case focusBoard:
+			m.board.MoveDown()
+			m.syncBoardToDetail()
+		case focusList:
+			if m.list.Index() < len(m.list.Items())-1 {
+				m.list.Select(m.list.Index() + 1)
+				m.updateViewportContent()
+			}
+		case focusDetail:
+			m.viewport.LineDown(3)
+		}
+	}
+	return m
 }
 
 // handleBoardKeys handles keyboard input when the board is focused (bv-yg39)

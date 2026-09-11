@@ -302,6 +302,7 @@ func runTUIProgram(m ui.Model) error {
 	p := tea.NewProgram(
 		m,
 		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
 		tea.WithoutSignalHandler(),
 	)
 

@@ -243,6 +243,20 @@ func TestTreeViewEnterAndExit(t *testing.T) {
 	containsAll(t, out, []string{"Epic One", "Task One"})
 }
 
+func TestTUIEnablesMouseCellMotion(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTreeFixture(t, tempDir, makeTreeHierarchy(t))
+
+	out, err := runTreeTUI(t, tempDir, 1200, nil)
+	if err != nil {
+		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
+	}
+
+	if !strings.Contains(string(out), "\x1b[?1002h") {
+		t.Fatal("TUI did not enable terminal mouse cell-motion reporting")
+	}
+}
+
 func TestTreeViewShiftKShowsCloseConfirmation(t *testing.T) {
 	tempDir := t.TempDir()
 	writeTreeFixture(t, tempDir, []treeFixtureIssue{
@@ -804,11 +818,35 @@ func TestTreeViewDeepNesting(t *testing.T) {
 
 // ANSI escape sequences for arrow keys as sent by real terminals.
 const (
-	arrowUp    = "\x1b[A"
-	arrowDown  = "\x1b[B"
-	arrowRight = "\x1b[C"
-	arrowLeft  = "\x1b[D"
+	arrowUp        = "\x1b[A"
+	arrowDown      = "\x1b[B"
+	arrowRight     = "\x1b[C"
+	arrowLeft      = "\x1b[D"
+	mouseWheelDown = "\x1b[<65;10;10M"
 )
+
+func TestTreeViewMouseWheelDownNavigation(t *testing.T) {
+	tempDir := t.TempDir()
+	writeTreeFixture(t, tempDir, makeTreeHierarchy(t))
+
+	out, err := runTreeTUI(t, tempDir, 2500, []keyStep{
+		k(mouseWheelDown),
+		k("K"),
+	})
+	if err != nil {
+		t.Fatalf("mouse-wheel run failed: %v\noutput:\n%s", err, out)
+	}
+
+	output := string(out)
+	confirmationStart := strings.LastIndex(output, "Close issue?")
+	if confirmationStart < 0 {
+		t.Fatalf("mouse wheel did not leave the TUI responsive to selection actions\noutput:\n%s", out)
+	}
+	confirmation := output[confirmationStart:]
+	if !strings.Contains(confirmation, "epic-2") {
+		t.Fatalf("mouse wheel did not select the next visible tree issue\nconfirmation output:\n%s", confirmation)
+	}
+}
 
 // TestTreeViewArrowDownNavigation verifies that the Down arrow key moves the
 // cursor in tree view, matching 'j' behavior. This tests the actual terminal

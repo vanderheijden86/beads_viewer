@@ -271,3 +271,85 @@ func TestNewModel_SetsTreeBeadsDirFromBeadsPath(t *testing.T) {
 		t.Fatalf("expected tree beadsDir %q, got %q", want, got)
 	}
 }
+
+func TestMouseWheelDownMovesTreeSelection(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "issue-1", Title: "First", Status: model.StatusOpen, IssueType: model.TypeTask, Priority: 1},
+		{ID: "issue-2", Title: "Second", Status: model.StatusOpen, IssueType: model.TypeTask, Priority: 2},
+	}
+	m := NewModel(issues, "")
+	initialID := m.tree.GetSelectedID()
+
+	updated, _ := m.Update(tea.MouseMsg{
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	})
+	m = updated.(Model)
+
+	if got := m.tree.GetSelectedID(); got == initialID {
+		t.Fatalf("mouse wheel down left tree selection on %q", got)
+	}
+}
+
+func TestMouseWheelUpMovesTreeSelection(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "issue-1", Title: "First", Status: model.StatusOpen, IssueType: model.TypeTask, Priority: 1},
+		{ID: "issue-2", Title: "Second", Status: model.StatusOpen, IssueType: model.TypeTask, Priority: 2},
+	}
+	m := NewModel(issues, "")
+	m.tree.MoveDown()
+	initialID := m.tree.GetSelectedID()
+
+	updated, _ := m.Update(tea.MouseMsg{
+		Button: tea.MouseButtonWheelUp,
+		Action: tea.MouseActionPress,
+	})
+	m = updated.(Model)
+
+	if got := m.tree.GetSelectedID(); got == initialID {
+		t.Fatalf("mouse wheel up left tree selection on %q", got)
+	}
+}
+
+func TestMouseWheelScrollsDetailViewport(t *testing.T) {
+	m := NewModel(nil, "")
+	m.focused = focusDetail
+	m.viewport.Height = 2
+	m.viewport.SetContent("one\ntwo\nthree\nfour\nfive")
+	m.viewport.LineDown(3)
+	initialOffset := m.viewport.YOffset
+
+	updated, _ := m.Update(tea.MouseMsg{
+		Button: tea.MouseButtonWheelUp,
+		Action: tea.MouseActionPress,
+	})
+	m = updated.(Model)
+
+	if got := m.viewport.YOffset; got >= initialOffset {
+		t.Fatalf("mouse wheel up left detail offset at %d, want less than %d", got, initialOffset)
+	}
+}
+
+func TestMouseWheelDownMovesBoardSelection(t *testing.T) {
+	issues := []model.Issue{
+		{ID: "issue-1", Title: "First", Status: model.StatusOpen, IssueType: model.TypeTask, Priority: 1},
+		{ID: "issue-2", Title: "Second", Status: model.StatusOpen, IssueType: model.TypeTask, Priority: 2},
+	}
+	m := NewModel(issues, "")
+	m.focused = focusBoard
+	initial := m.board.SelectedIssue()
+	if initial == nil {
+		t.Fatal("expected an initial board selection")
+	}
+
+	updated, _ := m.Update(tea.MouseMsg{
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+	})
+	m = updated.(Model)
+
+	selected := m.board.SelectedIssue()
+	if selected == nil || selected.ID == initial.ID {
+		t.Fatalf("mouse wheel down left board selection on %q", initial.ID)
+	}
+}

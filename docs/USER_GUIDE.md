@@ -848,8 +848,10 @@ The tree construction uses a **parent-child only** filter with intelligent root 
 |-----|--------|
 | **Movement** | |
 | `j` / `k` / `↓` / `↑` | Move cursor down / up |
+| Mouse wheel | Move through tasks or scroll the focused detail pane |
 | `g` / `G` | Jump to first / last node |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half viewport) |
+| Selection override + drag | Select terminal text (`Option` in iTerm2, commonly `Shift` elsewhere) |
 | **Expand/Collapse** | |
 | `Enter` / `Space` | Toggle expand/collapse on current node |
 | `l` / `→` | Expand node, or move to first child if already expanded |
