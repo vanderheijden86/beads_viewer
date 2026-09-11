@@ -28,6 +28,7 @@ type treeFixtureIssue struct {
 	IssueType    string            `json:"issue_type"`
 	CreatedAt    string            `json:"created_at"`
 	Labels       []string          `json:"labels,omitempty"`
+	Notes        string            `json:"notes,omitempty"`
 	Dependencies []*treeFixtureDep `json:"dependencies,omitempty"`
 }
 

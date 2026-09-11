@@ -4712,7 +4712,7 @@ func (m Model) queryCompletions() []string {
 			addMatch(field)
 		}
 		for _, issue := range m.issues {
-			for _, value := range issueSearchableValues(issue) {
+			for _, value := range issuePlainSearchValues(issue) {
 				for _, term := range queryCompletionTerms(value) {
 					addMatch(term)
 				}

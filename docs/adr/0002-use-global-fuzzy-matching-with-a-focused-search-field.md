@@ -2,9 +2,10 @@
 type: ADR
 id: "0002"
 title: "Use global fuzzy matching with a focused search field"
-status: active
+status: superseded
 date: 2026-09-11
 supersedes: "0001"
+superseded_by: "0004"
 ---
 
 ## Context

@@ -208,7 +208,7 @@ func fuzzyTextMatch(candidate, query string) bool {
 }
 
 func issueMatchesFuzzyText(issue model.Issue, query string) bool {
-	for _, candidate := range issueSearchableValues(issue) {
+	for _, candidate := range issuePlainSearchValues(issue) {
 		if fuzzyTextMatch(candidate, query) {
 			return true
 		}
@@ -216,32 +216,9 @@ func issueMatchesFuzzyText(issue model.Issue, query string) bool {
 	return false
 }
 
-func issueSearchableValues(issue model.Issue) []string {
-	values := []string{
-		issue.ID,
-		issue.Title,
-		issue.Description,
-		issue.Design,
-		issue.AcceptanceCriteria,
-		issue.Notes,
-		string(issue.Status),
-		fmt.Sprintf("p%d", issue.Priority),
-		string(issue.IssueType),
-		issue.Assignee,
-		issue.SourceRepo,
-	}
-	if issue.SourceRepo == "" {
-		values = append(values, ExtractRepoPrefix(issue.ID))
-	}
-	if issue.ExternalRef != nil {
-		values = append(values, *issue.ExternalRef)
-	}
+func issuePlainSearchValues(issue model.Issue) []string {
+	values := []string{issue.ID, issue.Title}
 	values = append(values, issue.Labels...)
-	for _, comment := range issue.Comments {
-		if comment != nil {
-			values = append(values, comment.Author, comment.Text)
-		}
-	}
 	return values
 }
 

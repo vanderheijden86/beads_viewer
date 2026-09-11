@@ -35,7 +35,7 @@ No web page loads, no heavy clients. `bw` starts instantly and lets you fly thro
 Don't just read the title. `bw` gives you the full picture:
 *   **Comments & History:** Scroll through the full conversation history of any task.
 *   **Metadata:** Instantly see Assignees, Labels, Priority badges, and creation dates.
-*   **Search:** A shared query field (`/`) fuzzily searches all issue content and composes structured fields such as status, type, priority, label, assignee, and project.
+*   **Search:** A shared query field (`/`) fuzzily searches issue IDs, titles, and labels, and composes structured fields such as status, type, priority, label, assignee, and project.
 
 ### 🎯 Focused Workflows
 *   **Kanban Board:** Press `b` to switch to a columnar view (Open, In Progress, Blocked, Closed) to visualize flow.
@@ -2587,7 +2587,7 @@ Press `/` in the tree, list, or board to reveal and focus one shared search fiel
 ╰──────────────────────────────────────────────────────────────╯
 ```
 
-Plain text searches IDs, titles, descriptions, design notes, acceptance criteria, notes, status, priority, type, labels, assignees, projects, external references, and comments. Short queries support fuzzy subsequence matching within one or two adjacent terms; longer queries require a contiguous text match. This keeps abbreviations useful without matching letters scattered across unrelated prose. Structured predicates constrain matching to a field:
+Plain text searches IDs, titles, and labels. Short queries support fuzzy subsequence matching within one or two adjacent terms; longer queries require a contiguous text match. Descriptions, notes, comments, dependency text, and other hidden fields are excluded so every result is explained by primary issue data. Structured predicates target other supported metadata:
 
 | Predicate | Example |
 | :--- | :--- |
@@ -2600,7 +2600,7 @@ Plain text searches IDs, titles, descriptions, design notes, acceptance criteria
 | Assignee | `assignee:andre` |
 | Project | `project:b9s` |
 
-Press `Tab` to complete a partially typed field, label, or ordinary search term found in the loaded issues. Multiple values for the same field are alternatives, while different fields compose with AND. Prefix a predicate with `!` to exclude it, for example `status:open !label:blocked`.
+Press `Tab` to complete a partially typed field or an ordinary ID, title, or label term found in the loaded issues. Multiple values for the same field are alternatives, while different fields compose with AND. Prefix a predicate with `!` to exclude it, for example `status:open !label:blocked`.
 
 - **While the query bar is focused, every keystroke goes into the query.** Global shortcuts are suspended, so query characters never trigger actions. Press `Enter` to accept the query and hide the field; press `/` to edit it again. Press `Esc` while editing or after acceptance to clear it.
 - **Incomplete predicates remain permissive.** `label:` shows every issue. Typing `label:l` then narrows the list live to issues with matching labels such as `lane`, `loser`, and `lover`.

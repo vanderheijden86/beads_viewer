@@ -33,41 +33,17 @@ func TestIssueQueryRejectsLongSparseSubsequence(t *testing.T) {
 	}
 }
 
-func TestIssueQueryPlainTextFuzzyMatchesSearchableContent(t *testing.T) {
-	externalRef := "https://github.com/example/project/issues/482"
+func TestIssueQueryPlainTextFuzzyMatchesPrimaryFields(t *testing.T) {
 	issue := model.Issue{
-		ID:                 "bd-gewa",
-		Title:              "Clean global search",
-		Description:        "Restore callback delivery",
-		Design:             "Use one canonical matcher",
-		AcceptanceCriteria: "Labels remain discoverable",
-		Notes:              "Reported from the spectroscope workspace",
-		Status:             model.StatusInProgress,
-		Priority:           1,
-		IssueType:          model.TypeBug,
-		Assignee:           "andre",
-		Labels:             []string{"lane-attempt=1"},
-		SourceRepo:         "b9s",
-		ExternalRef:        &externalRef,
-		Comments: []*model.Comment{
-			{Author: "operator", Text: "Fuzzy matching should include comments"},
-		},
+		ID:     "bd-gewa",
+		Title:  "Clean global search",
+		Labels: []string{"lane-attempt=1"},
 	}
 
 	tests := map[string]string{
-		"description":         "clbdel",
-		"design":              "cnmtr",
-		"acceptance criteria": "lbls",
-		"notes":               "spctrscp",
-		"status":              "inprg",
-		"priority":            "p1",
-		"type":                "bg",
-		"assignee":            "adr",
-		"label":               "lna1",
-		"project":             "b9",
-		"external reference":  "ghb482",
-		"comment author":      "optr",
-		"comment text":        "cmnts",
+		"ID":    "bdgwa",
+		"title": "clngbl",
+		"label": "lna1",
 	}
 
 	for name, raw := range tests {
@@ -134,6 +110,40 @@ func TestIssueQueryPlainTextDistinguishesRelevantTermsFromScatteredLetters(t *te
 		t.Run(test.name, func(t *testing.T) {
 			if got := ParseIssueQuery(test.raw).Matches(test.issue); got != test.want {
 				t.Errorf("query %q match = %t, want %t for issue %+v", test.raw, got, test.want, test.issue)
+			}
+		})
+	}
+}
+
+func TestIssueQueryPlainTextSearchesOnlyPrimaryFields(t *testing.T) {
+	externalRef := "https://github.com/example/project/issues/482"
+	tests := []struct {
+		name  string
+		raw   string
+		issue model.Issue
+		want  bool
+	}{
+		{name: "id", raw: "ljw", issue: model.Issue{ID: "bd-lj5w"}, want: true},
+		{name: "title", raw: "prvnt", issue: model.Issue{ID: "bd-neutral", Title: "Prevent irrelevant fuzzy matches"}, want: true},
+		{name: "label", raw: "lna1", issue: model.Issue{ID: "bd-neutral", Labels: []string{"lane-attempt=1"}}, want: true},
+		{name: "description", raw: "descneedle", issue: model.Issue{ID: "bd-neutral", Description: "descneedle"}, want: false},
+		{name: "design", raw: "designneedle", issue: model.Issue{ID: "bd-neutral", Design: "designneedle"}, want: false},
+		{name: "acceptance criteria", raw: "acceptneedle", issue: model.Issue{ID: "bd-neutral", AcceptanceCriteria: "acceptneedle"}, want: false},
+		{name: "notes", raw: "ljw", issue: model.Issue{ID: "bd-neutral", Notes: "Blocked by bd-lj5w"}, want: false},
+		{name: "status", raw: "inprg", issue: model.Issue{ID: "bd-neutral", Status: model.StatusInProgress}, want: false},
+		{name: "priority", raw: "p1", issue: model.Issue{ID: "bd-neutral", Priority: 1}, want: false},
+		{name: "type", raw: "bg", issue: model.Issue{ID: "bd-neutral", IssueType: model.TypeBug}, want: false},
+		{name: "assignee", raw: "andre", issue: model.Issue{ID: "bd-neutral", Assignee: "andre"}, want: false},
+		{name: "project", raw: "spectroscope", issue: model.Issue{ID: "bd-neutral", SourceRepo: "spectroscope"}, want: false},
+		{name: "external reference", raw: "ghb482", issue: model.Issue{ID: "bd-neutral", ExternalRef: &externalRef}, want: false},
+		{name: "comment author", raw: "operator", issue: model.Issue{ID: "bd-neutral", Comments: []*model.Comment{{Author: "operator"}}}, want: false},
+		{name: "comment text", raw: "commentneedle", issue: model.Issue{ID: "bd-neutral", Comments: []*model.Comment{{Text: "commentneedle"}}}, want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := ParseIssueQuery(test.raw).Matches(test.issue); got != test.want {
+				t.Errorf("plain query %q match = %t, want %t", test.raw, got, test.want)
 			}
 		})
 	}
@@ -240,6 +250,20 @@ func TestQueryTabCompletesPlainLabelAndSearchTerms(t *testing.T) {
 				t.Fatalf("completion for %q = %q, want %q", test.text, got, test.want)
 			}
 		})
+	}
+}
+
+func TestQueryTabDoesNotCompleteHiddenIssueContent(t *testing.T) {
+	m := NewModel([]model.Issue{
+		{ID: "issue-1", Title: "Neutral title", Notes: "laneinternal"},
+	}, "")
+	m.queryState.StartEditing()
+	m.setQueryText("lanei")
+
+	m.completeQuery()
+
+	if got := m.queryState.Text(); got != "lanei" {
+		t.Fatalf("completion exposed hidden issue content: got %q, want %q", got, "lanei")
 	}
 }
 

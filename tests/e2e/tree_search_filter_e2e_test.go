@@ -212,3 +212,36 @@ func TestGlobalSearchShowsOnlyRelevantPreventResultE2E(t *testing.T) {
 		}
 	}
 }
+
+func TestGlobalSearchIgnoresBlockerMentionsForShortIssuePathE2E(t *testing.T) {
+	tempDir := t.TempDir()
+	now := time.Now()
+	writeTreeFixture(t, tempDir, []treeFixtureIssue{
+		{ID: "bd-lj5w", Title: "Publish v0.8.1 search patch release", Status: "closed", Priority: 1, IssueType: "task", CreatedAt: now.Format(time.RFC3339)},
+		{ID: "bd-butn", Title: "Make dependency blocking visible in the TUI", Status: "open", Priority: 1, IssueType: "epic", CreatedAt: now.Add(time.Second).Format(time.RFC3339), Notes: "Blocked by bd-lj5w"},
+		{ID: "bd-ej4c", Title: "Match k9s search interaction", Status: "closed", Priority: 2, IssueType: "epic", CreatedAt: now.Add(2 * time.Second).Format(time.RFC3339), Notes: "Related release: bd-lj5w"},
+	})
+
+	out, err := runTreeTUI(t, tempDir, 2500, []keyStep{
+		kd("/", 150*time.Millisecond),
+		kd("ljw", 200*time.Millisecond),
+	})
+	if err != nil {
+		t.Fatalf("TUI run failed: %v\noutput:\n%s", err, out)
+	}
+
+	s := string(out)
+	queryStart := strings.LastIndex(s, "/ ljw")
+	if queryStart < 0 {
+		t.Fatalf("final query was not rendered\noutput:\n%s", s)
+	}
+	finalFrame := s[queryStart:]
+	if !strings.Contains(finalFrame, "Publish v0.8.1 search patch release") {
+		t.Fatalf("matching issue path is absent\noutput:\n%s", s)
+	}
+	for _, unrelated := range []string{"Make dependency blocking visible in the TUI", "Match k9s search interaction"} {
+		if strings.Contains(finalFrame, unrelated) {
+			t.Errorf("query retained issue mentioning the path only in notes %q\noutput:\n%s", unrelated, s)
+		}
+	}
+}
