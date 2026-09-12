@@ -1,0 +1,485 @@
+<div id="b9s-board-redesign">
+  <div class="brc-heading">
+    <div>
+      <h2>Board redesign concepts</h2>
+      <div class="text-muted text-small">Six information architectures using the same Spectroscope workload</div>
+    </div>
+    <span class="viz-badge">A recommended</span>
+  </div>
+
+  <div class="nav nav-pills" role="tablist" aria-label="Board redesign concepts">
+    <button class="nav-link active" id="brc-tab-a" role="tab" aria-controls="brc-panel-a" aria-selected="true" type="button">A Adaptive focus</button>
+    <button class="nav-link" id="brc-tab-b" role="tab" aria-controls="brc-panel-b" aria-selected="false" type="button">B Dense ledger</button>
+    <button class="nav-link" id="brc-tab-c" role="tab" aria-controls="brc-panel-c" aria-selected="false" type="button">C Epic matrix</button>
+    <button class="nav-link" id="brc-tab-d" role="tab" aria-controls="brc-panel-d" aria-selected="false" type="button">D Flow queues</button>
+    <button class="nav-link" id="brc-tab-e" role="tab" aria-controls="brc-panel-e" aria-selected="false" type="button">E Focus + inspector</button>
+    <button class="nav-link" id="brc-tab-f" role="tab" aria-controls="brc-panel-f" aria-selected="false" type="button">F Narrow stack</button>
+  </div>
+
+  <section id="brc-panel-a" role="tabpanel" aria-labelledby="brc-tab-a">
+    <div class="brc-terminal" aria-label="Adaptive focus board mockup">
+      <div class="brc-topline"><span>dolt://127.0.0.1:3306/spectroscope ✓</span><strong>spectroscope</strong></div>
+      <div class="brc-boardbar">
+        <strong>BOARD</strong><span>by status</span><span class="brc-count">106 issues</span>
+        <span class="brc-spacer"></span><span>open 29</span><span>running 1</span><span>blocked 0</span><span>closed 76</span>
+      </div>
+      <div class="brc-adaptive-grid">
+        <div class="brc-column brc-column-focus">
+          <div class="brc-column-head"><strong>OPEN</strong><span>29 · P1 5 · oldest 2d</span></div>
+          <div class="brc-row brc-selected">
+            <div class="brc-row-main"><strong>[eg0.5.3]</strong><span>Decide who may reach the device control plane</span><b>P1</b><time>2d</time></div>
+            <div class="brc-row-meta"><span>◆ decision</span><span class="brc-impact">blocks 1</span><span class="brc-lane">lane: queued</span></div>
+          </div>
+          <div class="brc-row">
+            <div class="brc-row-main"><strong>[eg0.4.2]</strong><span>Wire the flow subscription transport</span><b>P1</b><time>2d</time></div>
+            <div class="brc-row-meta"><span>✓ task</span><span class="brc-blocked">blocked by eg0.4.1</span></div>
+          </div>
+          <div class="brc-row">
+            <div class="brc-row-main"><strong>[eg0.4.1]</strong><span>Add packet append API with cursor semantics</span><b>P1</b><time>2d</time></div>
+            <div class="brc-row-meta"><span>✓ task</span><span class="brc-impact">blocks 5</span><span class="brc-lane">lane: reviewing</span></div>
+          </div>
+          <div class="brc-row">
+            <div class="brc-row-main"><strong>[eg0.4]</strong><span>Client renders live packet streams</span><b>P1</b><time>2d</time></div>
+            <div class="brc-row-meta"><span>▲ feature</span><span class="brc-lane">lane: ready</span></div>
+          </div>
+          <div class="brc-more">25 more · j/k move · enter detail</div>
+        </div>
+        <div class="brc-column">
+          <div class="brc-column-head"><strong>IN PROGRESS</strong><span>1 · age 1m</span></div>
+          <div class="brc-row">
+            <div class="brc-row-main"><strong>[eg0.14.1]</strong><span>Use recorded mac-k3s capture fixture</span><b>P2</b><time>1m</time></div>
+            <div class="brc-row-meta"><span>✓ task</span><span class="brc-lane">lane: implementing</span></div>
+          </div>
+        </div>
+        <div class="brc-column">
+          <div class="brc-column-head"><strong>BLOCKED</strong><span>0 computed</span></div>
+          <div class="brc-empty">No stored blocked statuses<br><span>2 open issues have dependencies</span></div>
+        </div>
+        <div class="brc-column brc-rail">
+          <div class="brc-column-head"><strong>CLOSED</strong><span>76 · 5 today</span></div>
+          <div class="brc-rail-copy">Recent<br><strong>[eg0.2.5]</strong><br><strong>[eg0.2.2]</strong><br><strong>[jzf.6]</strong><br><br>Enter to expand</div>
+        </div>
+      </div>
+      <div class="brc-keys"><span>h/l column</span><span>j/k item</span><span>enter detail</span><span>tab inspector</span><span>s swimlane</span><span>/ search</span></div>
+    </div>
+    <div class="brc-verdict"><strong>Strength:</strong> uses width where work exists. <strong>Risk:</strong> columns move when focus changes. <strong>Build:</strong> medium.</div>
+  </section>
+
+  <section id="brc-panel-b" role="tabpanel" aria-labelledby="brc-tab-b" hidden>
+    <div class="brc-terminal" aria-label="Dense ledger board mockup">
+      <div class="brc-topline"><span>dolt://127.0.0.1:3306/spectroscope ✓</span><strong>spectroscope</strong></div>
+      <div class="brc-boardbar"><strong>BOARD LEDGER</strong><span>status groups</span><span class="brc-spacer"></span><span>106 visible</span><span>sort priority</span></div>
+      <div class="brc-ledger">
+        <div class="brc-ledger-head"><span>STATE</span><span>ISSUE</span><span>TITLE</span><span>PRI</span><span>LANE STATE</span><span>BLOCKED BY</span><span>AGE</span></div>
+        <div class="brc-group"><strong>OPEN</strong><span>29</span><span>5 high priority</span></div>
+        <div class="brc-ledger-row brc-selected"><span>OPEN</span><strong>[eg0.5.3]</strong><span>Decide who may reach the device control plane</span><b>P1</b><span class="brc-lane">QUEUED</span><span>none</span><time>2d</time></div>
+        <div class="brc-ledger-row"><span>OPEN</span><strong>[eg0.4.2]</strong><span>Wire the flow subscription transport</span><b>P1</b><span></span><span class="brc-blocked">eg0.4.1</span><time>2d</time></div>
+        <div class="brc-ledger-row"><span>OPEN</span><strong>[eg0.4.1]</strong><span>Add packet append API with cursor semantics</span><b>P1</b><span class="brc-lane">REVIEWING</span><span>none</span><time>2d</time></div>
+        <div class="brc-ledger-row"><span>OPEN</span><strong>[eg0.4]</strong><span>Client renders live packet streams</span><b>P1</b><span class="brc-lane">READY</span><span>none</span><time>2d</time></div>
+        <div class="brc-group"><strong>IN PROGRESS</strong><span>1</span><span>started 1m ago</span></div>
+        <div class="brc-ledger-row"><span>RUN</span><strong>[eg0.14.1]</strong><span>Use recorded mac-k3s capture fixture</span><b>P2</b><span class="brc-lane">IMPLEMENTING</span><span>none</span><time>1m</time></div>
+        <div class="brc-group"><strong>CLOSED</strong><span>76</span><span>collapsed · press enter</span></div>
+      </div>
+      <div class="brc-keys"><span>j/k row</span><span>h/l group</span><span>enter fold</span><span>tab inspector</span><span>s grouping</span><span>/ search</span></div>
+    </div>
+    <div class="brc-verdict"><strong>Strength:</strong> maximum scan density and stable columns. <strong>Risk:</strong> feels less like Kanban. <strong>Build:</strong> low.</div>
+  </section>
+
+  <section id="brc-panel-c" role="tabpanel" aria-labelledby="brc-tab-c" hidden>
+    <div class="brc-terminal" aria-label="Epic matrix board mockup">
+      <div class="brc-topline"><span>dolt://127.0.0.1:3306/spectroscope ✓</span><strong>spectroscope</strong></div>
+      <div class="brc-boardbar"><strong>BOARD</strong><span>by epic + status</span><span class="brc-spacer"></span><span>4 epics</span><span>106 issues</span></div>
+      <div class="brc-matrix">
+        <div class="brc-matrix-head"><span>EPIC</span><span>OPEN</span><span>RUNNING</span><span>WAITING</span><span>DONE</span></div>
+        <div class="brc-epic-name"><strong>[eg0]</strong><span>Spectroscope observes the cluster</span><small>21 issues · 42%</small></div>
+        <div class="brc-matrix-cell"><div class="brc-mini brc-selected"><strong>eg0.5.3</strong><span>Device control access</span><small>P1 · lane queued</small></div><div class="brc-mini"><strong>eg0.4</strong><span>Live packet client</span><small>P1 · 2d</small></div></div>
+        <div class="brc-matrix-cell"><div class="brc-mini"><strong>eg0.14.1</strong><span>Recorded capture fixture</span><small>P2 · implementing</small></div></div>
+        <div class="brc-matrix-cell"><div class="brc-mini brc-waiting"><strong>eg0.4.2</strong><span>Flow subscription</span><small>waits for eg0.4.1</small></div></div>
+        <div class="brc-matrix-cell"><span class="brc-cell-count">12 closed</span></div>
+
+        <div class="brc-epic-name"><strong>[jzf]</strong><span>Preview build reliability</span><small>8 issues · 75%</small></div>
+        <div class="brc-matrix-cell"><div class="brc-mini"><strong>jzf.8</strong><span>Bound preview startup</span><small>P1 · ready</small></div></div>
+        <div class="brc-matrix-cell"><span class="brc-cell-count">none</span></div>
+        <div class="brc-matrix-cell"><span class="brc-cell-count">none</span></div>
+        <div class="brc-matrix-cell"><span class="brc-cell-count">6 closed</span></div>
+
+        <div class="brc-epic-name"><strong>Ungrouped</strong><span>Operational work</span><small>77 issues</small></div>
+        <div class="brc-matrix-cell"><span class="brc-cell-count">25 open</span></div>
+        <div class="brc-matrix-cell"><span class="brc-cell-count">none</span></div>
+        <div class="brc-matrix-cell"><span class="brc-cell-count">1 dependency wait</span></div>
+        <div class="brc-matrix-cell"><span class="brc-cell-count">51 closed</span></div>
+      </div>
+      <div class="brc-keys"><span>j/k epic</span><span>h/l state</span><span>enter cell</span><span>space expand</span><span>/ search</span></div>
+    </div>
+    <div class="brc-verdict"><strong>Strength:</strong> exposes delivery progress by initiative. <strong>Risk:</strong> ungrouped work can dominate. <strong>Build:</strong> high.</div>
+  </section>
+
+  <section id="brc-panel-d" role="tabpanel" aria-labelledby="brc-tab-d" hidden>
+    <div class="brc-terminal" aria-label="Flow queue board mockup">
+      <div class="brc-topline"><span>dolt://127.0.0.1:3306/spectroscope ✓</span><strong>spectroscope</strong></div>
+      <div class="brc-boardbar"><strong>FLOW QUEUES</strong><span>computed readiness + lane state</span><span class="brc-spacer"></span><span>ready 27</span><span>waiting 2</span></div>
+      <div class="brc-flow-grid">
+        <div class="brc-column">
+          <div class="brc-column-head"><strong>READY NOW</strong><span>27 actionable</span></div>
+          <div class="brc-row brc-selected"><div class="brc-row-main"><strong>[eg0.5.3]</strong><span>Device control access</span><b>P1</b></div><div class="brc-row-meta"><span>no open dependencies</span><span class="brc-impact">blocks 1</span></div></div>
+          <div class="brc-row"><div class="brc-row-main"><strong>[eg0.4.1]</strong><span>Packet append API</span><b>P1</b></div><div class="brc-row-meta"><span class="brc-lane">lane: reviewing</span><span class="brc-impact">blocks 5</span></div></div>
+          <div class="brc-row"><div class="brc-row-main"><strong>[eg0.4]</strong><span>Live packet client</span><b>P1</b></div><div class="brc-row-meta"><span class="brc-lane">lane: ready</span></div></div>
+        </div>
+        <div class="brc-column">
+          <div class="brc-column-head"><strong>IN A LANE</strong><span>1 active</span></div>
+          <div class="brc-row"><div class="brc-row-main"><strong>[eg0.14.1]</strong><span>Recorded capture fixture</span><b>P2</b></div><div class="brc-row-meta"><span>status: in progress</span><span class="brc-lane">IMPLEMENTING</span></div></div>
+        </div>
+        <div class="brc-column">
+          <div class="brc-column-head"><strong>WAITING ON</strong><span>2 dependency blocked</span></div>
+          <div class="brc-row brc-waiting"><div class="brc-row-main"><strong>[eg0.4.2]</strong><span>Flow subscription transport</span><b>P1</b></div><div class="brc-row-meta"><span class="brc-blocked">eg0.4.1 · Packet API</span><span>open</span></div></div>
+          <div class="brc-row brc-waiting"><div class="brc-row-main"><strong>[eg0.16.1]</strong><span>Integrate capture import</span><b>P2</b></div><div class="brc-row-meta"><span class="brc-blocked">eg0.15.1 · Capture core</span><span class="brc-lane">lane: blocked</span></div></div>
+        </div>
+        <div class="brc-column">
+          <div class="brc-column-head"><strong>DELIVERED</strong><span>5 today</span></div>
+          <div class="brc-row"><div class="brc-row-main"><strong>[eg0.2.5]</strong><span>Redaction profile applied</span><b>P0</b></div><div class="brc-row-meta"><span class="brc-lane">lane: delivered</span><time>1d</time></div></div>
+          <div class="brc-row"><div class="brc-row-main"><strong>[jzf.6]</strong><span>Preview build requires Docker</span><b>P0</b></div><div class="brc-row-meta"><span>closed</span><time>4d</time></div></div>
+        </div>
+      </div>
+      <div class="brc-keys"><span>h/l queue</span><span>j/k item</span><span>enter detail</span><span>s lens</span><span>r ready only</span></div>
+    </div>
+    <div class="brc-verdict"><strong>Strength:</strong> answers what can move and why work waits. <strong>Risk:</strong> it is a workflow lens, not stored status. <strong>Build:</strong> medium-high.</div>
+  </section>
+
+  <section id="brc-panel-e" role="tabpanel" aria-labelledby="brc-tab-e" hidden>
+    <div class="brc-terminal" aria-label="Board with persistent inspector mockup">
+      <div class="brc-topline"><span>dolt://127.0.0.1:3306/spectroscope ✓</span><strong>spectroscope</strong></div>
+      <div class="brc-boardbar"><strong>BOARD</strong><span>compact status columns</span><span class="brc-spacer"></span><span>tab: inspector focused</span></div>
+      <div class="brc-inspector-layout">
+        <div class="brc-compact-board">
+          <div class="brc-column">
+            <div class="brc-column-head"><strong>OPEN</strong><span>29</span></div>
+            <div class="brc-compact-row brc-selected"><strong>eg0.5.3</strong><span>Device control access</span><b>P1</b></div>
+            <div class="brc-compact-row"><strong>eg0.4.2</strong><span>Flow subscription</span><b>P1</b></div>
+            <div class="brc-compact-row"><strong>eg0.4.1</strong><span>Packet append API</span><b>P1</b></div>
+            <div class="brc-compact-row"><strong>eg0.4</strong><span>Live packet client</span><b>P1</b></div>
+          </div>
+          <div class="brc-column">
+            <div class="brc-column-head"><strong>RUN</strong><span>1</span></div>
+            <div class="brc-compact-row"><strong>eg0.14.1</strong><span>Recorded capture fixture</span><b>P2</b></div>
+          </div>
+          <div class="brc-column">
+            <div class="brc-column-head"><strong>WAIT</strong><span>2 computed</span></div>
+            <div class="brc-compact-row"><strong>eg0.4.2</strong><span>waits for eg0.4.1</span><b>P1</b></div>
+            <div class="brc-compact-row"><strong>eg0.16.1</strong><span>waits for eg0.15.1</span><b>P2</b></div>
+          </div>
+        </div>
+        <aside class="brc-inspector" aria-label="Selected issue detail">
+          <div class="brc-inspector-head"><span>◆ DECISION · P1</span><strong>[eg0.5.3]</strong></div>
+          <h3>Decide who may reach the device control plane</h3>
+          <dl>
+            <div><dt>Status</dt><dd>OPEN</dd></div>
+            <div class="brc-lane"><dt>Lane state</dt><dd>QUEUED</dd></div>
+            <div><dt>Ready</dt><dd>yes</dd></div>
+            <div><dt>Impact</dt><dd>blocks eg0.5.4</dd></div>
+          </dl>
+          <p>Define the reachability boundary for device control traffic before transport implementation begins.</p>
+          <div class="brc-inspector-section"><strong>Dependencies</strong><span>none</span></div>
+          <div class="brc-inspector-section"><strong>Labels</strong><span>lane-queue · security · control-plane</span></div>
+          <div class="brc-inspector-section"><strong>Updated</strong><span>2 days ago</span></div>
+        </aside>
+      </div>
+      <div class="brc-keys"><span>h/l column</span><span>j/k item</span><span>tab board/inspector</span><span>u/d detail scroll</span></div>
+    </div>
+    <div class="brc-verdict"><strong>Strength:</strong> titles stay compact while full context remains visible. <strong>Risk:</strong> fewer cards fit horizontally. <strong>Build:</strong> low-medium.</div>
+  </section>
+
+  <section id="brc-panel-f" role="tabpanel" aria-labelledby="brc-tab-f" hidden>
+    <div class="brc-narrow-stage">
+      <div class="brc-terminal brc-terminal-narrow" aria-label="Narrow stacked board mockup">
+        <div class="brc-topline"><span>spectroscope</span><strong>BOARD</strong></div>
+        <div class="brc-boardbar"><strong>STATUS</strong><span>106 issues</span><span class="brc-spacer"></span><span>1/4</span></div>
+        <div class="brc-stack-head brc-stack-active"><strong>▼ OPEN</strong><span>29 · P1 5 · age 2d</span></div>
+        <div class="brc-row brc-selected"><div class="brc-row-main"><strong>[eg0.5.3]</strong><b>P1</b><time>2d</time></div><div class="brc-row-title">Decide who may reach the device control plane</div><div class="brc-row-meta"><span class="brc-lane">lane: queued</span><span class="brc-impact">blocks 1</span></div></div>
+        <div class="brc-row"><div class="brc-row-main"><strong>[eg0.4.2]</strong><b>P1</b><time>2d</time></div><div class="brc-row-title">Wire the flow subscription transport</div><div class="brc-row-meta"><span class="brc-blocked">blocked by eg0.4.1</span></div></div>
+        <div class="brc-row"><div class="brc-row-main"><strong>[eg0.4.1]</strong><b>P1</b><time>2d</time></div><div class="brc-row-title">Add packet append API with cursor semantics</div><div class="brc-row-meta"><span class="brc-lane">lane: reviewing</span></div></div>
+        <div class="brc-stack-head"><strong>▶ IN PROGRESS</strong><span>1</span></div>
+        <div class="brc-stack-head"><strong>▶ WAITING</strong><span>2 computed</span></div>
+        <div class="brc-stack-head"><strong>▶ CLOSED</strong><span>76</span></div>
+        <div class="brc-keys"><span>j/k item</span><span>h/l section</span><span>enter fold</span><span>/ search</span></div>
+      </div>
+    </div>
+    <div class="brc-verdict"><strong>Strength:</strong> reliable below 80 columns with no horizontal squeeze. <strong>Risk:</strong> cross-column comparison becomes sequential. <strong>Build:</strong> medium.</div>
+  </section>
+</div>
+
+<style>
+  #b9s-board-redesign {
+    color-scheme: light dark;
+    width: 100%;
+    color: light-dark(#20242b, #e6e8ee);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  #b9s-board-redesign .brc-heading,
+  #b9s-board-redesign .brc-boardbar,
+  #b9s-board-redesign .brc-topline,
+  #b9s-board-redesign .brc-column-head,
+  #b9s-board-redesign .brc-row-main,
+  #b9s-board-redesign .brc-row-meta,
+  #b9s-board-redesign .brc-keys,
+  #b9s-board-redesign .brc-group,
+  #b9s-board-redesign .brc-inspector-head,
+  #b9s-board-redesign .brc-inspector-section,
+  #b9s-board-redesign .brc-stack-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #b9s-board-redesign .brc-heading {
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  #b9s-board-redesign .brc-heading h2 { margin: 0; }
+  #b9s-board-redesign .nav { margin-bottom: 12px; }
+  #b9s-board-redesign .brc-terminal {
+    margin-top: 10px;
+    overflow: hidden;
+    border: 1px solid light-dark(#9aa1ac, #444b5d);
+    border-radius: 8px;
+    background: light-dark(#f7f8fa, #121418);
+    color: light-dark(#242832, #e1e4ea);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    box-shadow: 0 12px 28px light-dark(rgba(20, 24, 32, 0.12), rgba(0, 0, 0, 0.35));
+  }
+  #b9s-board-redesign .brc-topline {
+    justify-content: space-between;
+    padding: 8px 12px;
+    color: light-dark(#475569, #9ca6be);
+    border-bottom: 1px solid light-dark(#d8dce3, #303644);
+  }
+  #b9s-board-redesign .brc-topline strong { color: light-dark(#6d28d9, #c4a7ff); }
+  #b9s-board-redesign .brc-boardbar {
+    min-height: 38px;
+    padding: 0 12px;
+    border-bottom: 1px solid light-dark(#d8dce3, #303644);
+    color: light-dark(#596174, #aab2c5);
+  }
+  #b9s-board-redesign .brc-boardbar strong { color: light-dark(#6d28d9, #c4a7ff); }
+  #b9s-board-redesign .brc-spacer { flex: 1; }
+  #b9s-board-redesign .brc-count { color: light-dark(#20242b, #e6e8ee); }
+  #b9s-board-redesign .brc-adaptive-grid {
+    display: grid;
+    grid-template-columns: minmax(360px, 2fr) minmax(210px, 1.15fr) minmax(210px, 1.15fr) minmax(112px, .55fr);
+    min-height: 520px;
+  }
+  #b9s-board-redesign .brc-flow-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-height: 500px;
+  }
+  #b9s-board-redesign .brc-column {
+    min-width: 0;
+    border-right: 1px solid light-dark(#d8dce3, #303644);
+  }
+  #b9s-board-redesign .brc-column:last-child { border-right: 0; }
+  #b9s-board-redesign .brc-column-head {
+    justify-content: space-between;
+    min-height: 38px;
+    padding: 0 11px;
+    color: light-dark(#5c6476, #9ba5bb);
+    border-bottom: 1px solid light-dark(#d8dce3, #303644);
+  }
+  #b9s-board-redesign .brc-column-head strong { color: light-dark(#2b6a7a, #75d7ec); }
+  #b9s-board-redesign .brc-column-focus .brc-column-head strong { color: light-dark(#6d28d9, #c4a7ff); }
+  #b9s-board-redesign .brc-row {
+    padding: 11px 12px;
+    border-bottom: 1px solid light-dark(#e0e3e8, #272c37);
+  }
+  #b9s-board-redesign[data-density="compact"] .brc-row { padding-top: 6px; padding-bottom: 6px; }
+  #b9s-board-redesign .brc-row-main { align-items: baseline; }
+  #b9s-board-redesign .brc-row-main strong { color: light-dark(#5b21b6, #c4a7ff); white-space: nowrap; }
+  #b9s-board-redesign .brc-row-main span { flex: 1; min-width: 0; }
+  #b9s-board-redesign .brc-row-main b { color: light-dark(#b42318, #ff6b75); font-weight: 500; }
+  #b9s-board-redesign .brc-row-main time { color: light-dark(#357a45, #79cf8d); white-space: nowrap; }
+  #b9s-board-redesign .brc-row-title { margin-top: 5px; }
+  #b9s-board-redesign .brc-row-meta { margin-top: 7px; color: light-dark(#697386, #8f99af); flex-wrap: wrap; }
+  #b9s-board-redesign .brc-selected {
+    background: light-dark(#e9e1ff, #293047);
+    box-shadow: inset 3px 0 0 light-dark(#6d28d9, #c4a7ff);
+  }
+  #b9s-board-redesign .brc-blocked { color: light-dark(#b42318, #ff6b75); }
+  #b9s-board-redesign .brc-impact { color: light-dark(#98610b, #f5bc55); }
+  #b9s-board-redesign .brc-lane { color: light-dark(#1f6f78, #75d7ec); }
+  #b9s-board-redesign[data-lane="false"] .brc-lane { display: none; }
+  #b9s-board-redesign .brc-empty {
+    padding: 80px 18px;
+    text-align: center;
+    color: light-dark(#697386, #8f99af);
+  }
+  #b9s-board-redesign .brc-empty span { display: inline-block; margin-top: 8px; }
+  #b9s-board-redesign .brc-rail-copy {
+    padding: 14px 10px;
+    color: light-dark(#697386, #8f99af);
+    line-height: 1.8;
+  }
+  #b9s-board-redesign .brc-rail-copy strong { color: light-dark(#4b5563, #b8bfd0); }
+  #b9s-board-redesign .brc-more {
+    padding: 12px;
+    text-align: center;
+    color: light-dark(#697386, #8f99af);
+  }
+  #b9s-board-redesign .brc-keys {
+    min-height: 34px;
+    padding: 0 12px;
+    flex-wrap: wrap;
+    border-top: 1px solid light-dark(#d8dce3, #303644);
+    color: light-dark(#5f477f, #b9a1df);
+  }
+  #b9s-board-redesign .brc-verdict {
+    padding: 9px 2px 4px;
+    color: light-dark(#586174, #aab2c5);
+  }
+  #b9s-board-redesign .brc-verdict strong { color: light-dark(#252a34, #e1e4ea); }
+  #b9s-board-redesign .brc-ledger { min-height: 500px; }
+  #b9s-board-redesign .brc-ledger-head,
+  #b9s-board-redesign .brc-ledger-row {
+    display: grid;
+    grid-template-columns: 80px 110px minmax(250px, 1fr) 55px 125px 145px 55px;
+    align-items: center;
+    gap: 8px;
+    min-height: 39px;
+    padding: 0 12px;
+    border-bottom: 1px solid light-dark(#e0e3e8, #272c37);
+  }
+  #b9s-board-redesign .brc-ledger-head { color: light-dark(#596174, #9ba5bb); }
+  #b9s-board-redesign .brc-ledger-row strong { color: light-dark(#5b21b6, #c4a7ff); }
+  #b9s-board-redesign .brc-ledger-row b { color: light-dark(#b42318, #ff6b75); font-weight: 500; }
+  #b9s-board-redesign .brc-ledger-row time { color: light-dark(#357a45, #79cf8d); }
+  #b9s-board-redesign .brc-group {
+    min-height: 35px;
+    padding: 0 12px;
+    background: light-dark(#eceef2, #1b1f27);
+    color: light-dark(#596174, #9ba5bb);
+  }
+  #b9s-board-redesign .brc-group strong { color: light-dark(#2b6a7a, #75d7ec); }
+  #b9s-board-redesign .brc-matrix {
+    display: grid;
+    grid-template-columns: 220px repeat(4, minmax(150px, 1fr));
+    min-height: 500px;
+  }
+  #b9s-board-redesign .brc-matrix-head { display: contents; }
+  #b9s-board-redesign .brc-matrix-head span {
+    padding: 10px;
+    border-right: 1px solid light-dark(#d8dce3, #303644);
+    border-bottom: 1px solid light-dark(#d8dce3, #303644);
+    color: light-dark(#596174, #9ba5bb);
+  }
+  #b9s-board-redesign .brc-epic-name,
+  #b9s-board-redesign .brc-matrix-cell {
+    min-width: 0;
+    padding: 10px;
+    border-right: 1px solid light-dark(#d8dce3, #303644);
+    border-bottom: 1px solid light-dark(#d8dce3, #303644);
+  }
+  #b9s-board-redesign .brc-epic-name { display: flex; flex-direction: column; gap: 4px; }
+  #b9s-board-redesign .brc-epic-name strong { color: light-dark(#5b21b6, #c4a7ff); }
+  #b9s-board-redesign .brc-epic-name small,
+  #b9s-board-redesign .brc-mini small { color: light-dark(#697386, #8f99af); }
+  #b9s-board-redesign .brc-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: light-dark(#eceef2, #1b1f27);
+  }
+  #b9s-board-redesign .brc-mini strong { color: light-dark(#5b21b6, #c4a7ff); }
+  #b9s-board-redesign .brc-mini.brc-selected { background: light-dark(#e9e1ff, #293047); }
+  #b9s-board-redesign .brc-mini.brc-waiting { box-shadow: inset 3px 0 0 light-dark(#b42318, #ff6b75); }
+  #b9s-board-redesign .brc-cell-count { color: light-dark(#697386, #8f99af); }
+  #b9s-board-redesign .brc-inspector-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(310px, .8fr);
+    min-height: 510px;
+  }
+  #b9s-board-redesign .brc-compact-board {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    border-right: 1px solid light-dark(#d8dce3, #303644);
+  }
+  #b9s-board-redesign .brc-compact-row {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr) 28px;
+    gap: 8px;
+    padding: 9px 10px;
+    border-bottom: 1px solid light-dark(#e0e3e8, #272c37);
+  }
+  #b9s-board-redesign .brc-compact-row strong { color: light-dark(#5b21b6, #c4a7ff); }
+  #b9s-board-redesign .brc-compact-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #b9s-board-redesign .brc-compact-row b { color: light-dark(#b42318, #ff6b75); font-weight: 500; }
+  #b9s-board-redesign .brc-inspector { padding: 16px; background: light-dark(#f0f2f5, #181b22); }
+  #b9s-board-redesign .brc-inspector-head { justify-content: space-between; color: light-dark(#1f6f78, #75d7ec); }
+  #b9s-board-redesign .brc-inspector h3 { margin: 18px 0; font-size: 1rem; font-weight: 500; }
+  #b9s-board-redesign .brc-inspector dl { margin: 0; }
+  #b9s-board-redesign .brc-inspector dl div { display: grid; grid-template-columns: 90px 1fr; padding: 5px 0; }
+  #b9s-board-redesign .brc-inspector dt { color: light-dark(#697386, #8f99af); }
+  #b9s-board-redesign .brc-inspector dd { margin: 0; }
+  #b9s-board-redesign .brc-inspector p { color: light-dark(#4f586a, #b6bdcb); }
+  #b9s-board-redesign .brc-inspector-section {
+    align-items: flex-start;
+    padding: 10px 0;
+    border-top: 1px solid light-dark(#d8dce3, #303644);
+  }
+  #b9s-board-redesign .brc-inspector-section strong { width: 105px; }
+  #b9s-board-redesign .brc-inspector-section span { flex: 1; color: light-dark(#596174, #aab2c5); }
+  #b9s-board-redesign .brc-narrow-stage { display: flex; justify-content: center; padding: 10px 0; }
+  #b9s-board-redesign .brc-terminal-narrow { width: min(100%, 560px); margin: 0; }
+  #b9s-board-redesign .brc-stack-head {
+    justify-content: space-between;
+    min-height: 40px;
+    padding: 0 12px;
+    border-bottom: 1px solid light-dark(#d8dce3, #303644);
+    color: light-dark(#596174, #9ba5bb);
+  }
+  #b9s-board-redesign .brc-stack-active { background: light-dark(#eceef2, #1b1f27); color: light-dark(#2b6a7a, #75d7ec); }
+  @media (max-width: 820px) {
+    #b9s-board-redesign .brc-adaptive-grid,
+    #b9s-board-redesign .brc-flow-grid,
+    #b9s-board-redesign .brc-inspector-layout,
+    #b9s-board-redesign .brc-compact-board { grid-template-columns: 1fr; min-height: 0; }
+    #b9s-board-redesign .brc-column,
+    #b9s-board-redesign .brc-compact-board { border-right: 0; }
+    #b9s-board-redesign .brc-rail-copy { line-height: 1.5; }
+    #b9s-board-redesign .brc-matrix { grid-template-columns: minmax(84px, 1.2fr) repeat(4, minmax(0, 1fr)); }
+    #b9s-board-redesign .brc-ledger-head { display: none; }
+    #b9s-board-redesign .brc-ledger-row {
+      grid-template-columns: 55px 76px minmax(120px, 1fr) 32px;
+      grid-template-areas: "state id title priority" "state lane blocked age";
+      min-height: 58px;
+      padding-top: 6px;
+      padding-bottom: 6px;
+    }
+    #b9s-board-redesign .brc-ledger-row > :nth-child(1) { grid-area: state; }
+    #b9s-board-redesign .brc-ledger-row > :nth-child(2) { grid-area: id; }
+    #b9s-board-redesign .brc-ledger-row > :nth-child(3) { grid-area: title; }
+    #b9s-board-redesign .brc-ledger-row > :nth-child(4) { grid-area: priority; }
+    #b9s-board-redesign .brc-ledger-row > :nth-child(5) { grid-area: lane; }
+    #b9s-board-redesign .brc-ledger-row > :nth-child(6) { grid-area: blocked; }
+    #b9s-board-redesign .brc-ledger-row > :nth-child(7) { grid-area: age; }
+    #b9s-board-redesign .brc-boardbar { flex-wrap: wrap; padding-top: 7px; padding-bottom: 7px; }
+  }
+</style>
+
+<script>
+  (() => {
+    const root = document.getElementById('b9s-board-redesign');
+    const state = { density: 'comfortable', showLaneState: true };
+
+    function renderBoardOptions() {
+      root.dataset.density = state.density;
+      root.dataset.lane = String(state.showLaneState);
+    }
+
+    renderBoardOptions();
+
+    if (globalThis.Tweak) {
+      const tweak = new Tweak({ container: root, onChange: renderBoardOptions });
+      tweak.addSelect(state, 'density', { label: 'Row density', options: ['comfortable', 'compact'], reference: 'board.density' });
+      tweak.addToggle(state, 'showLaneState', { label: 'Show lane state', reference: 'board.lane-state' });
+    }
+  })();
+</script>
