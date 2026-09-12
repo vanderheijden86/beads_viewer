@@ -1081,6 +1081,47 @@ func TestProjectPicker_NarrowTerminalDropsColumns(t *testing.T) {
 	}
 }
 
+func TestProjectPicker_WideLayoutPaginatesAfterNineNumberedProjects(t *testing.T) {
+	entries := make([]ui.ProjectEntry, 10)
+	for i := range entries {
+		entries[i] = ui.ProjectEntry{
+			Project: config.Project{Name: fmt.Sprintf("proj-%02d", i+1), Path: "/tmp/p"},
+		}
+	}
+
+	picker := ui.NewProjectPicker(entries, ui.TestTheme())
+	picker.SetSize(160, 40)
+
+	plain := stripAnsiCodes(picker.View())
+	if strings.Contains(plain, "proj-10") {
+		t.Fatalf("tenth project must be paginated instead of rendered without a number:\n%s", plain)
+	}
+	if !strings.Contains(plain, "↓1") {
+		t.Fatalf("expected one paginated project, view:\n%s", plain)
+	}
+}
+
+func TestProjectPicker_NarrowLayoutPaginatesAfterFiveProjects(t *testing.T) {
+	entries := make([]ui.ProjectEntry, 6)
+	for i := range entries {
+		entries[i] = ui.ProjectEntry{
+			Project: config.Project{Name: fmt.Sprintf("proj-%02d", i+1), Path: "/tmp/p"},
+		}
+	}
+
+	picker := ui.NewProjectPicker(entries, ui.TestTheme())
+	picker.SetSize(60, 40)
+	picker, _ = picker.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+
+	if picker.ScrollOffset() != 1 {
+		t.Fatalf("expected narrow layout to scroll to the second page, offset = %d", picker.ScrollOffset())
+	}
+	plain := stripAnsiCodes(picker.View())
+	if !strings.Contains(plain, "proj-06") {
+		t.Fatalf("expected sixth project after scrolling narrow layout, view:\n%s", plain)
+	}
+}
+
 // TestProjectPicker_PageRelativeNumbering verifies that pressing "1" always selects
 // the first entry in the visible page (scroll-relative), regardless of which is active.
 func TestProjectPicker_PageRelativeNumbering(t *testing.T) {

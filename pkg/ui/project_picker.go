@@ -59,6 +59,8 @@ const maxVisibleProjects = 9
 // Title bar adds 1 more.
 const panelRows = 6
 
+const projectColumnSeparator = "  │  "
+
 // NewProjectPicker creates a new project picker.
 func NewProjectPicker(entries []ProjectEntry, theme Theme) ProjectPickerModel {
 	ti := textinput.New()
@@ -140,7 +142,7 @@ func (m ProjectPickerModel) updateNormal(msg tea.KeyMsg) (ProjectPickerModel, te
 		m.filterInput.Focus()
 	case "j", "down":
 		// Scroll the visible window down through the project list (bd-i8t3).
-		maxScroll := len(m.filtered) - maxVisibleProjects
+		maxScroll := len(m.filtered) - m.visibleProjectCapacity()
 		if maxScroll < 0 {
 			maxScroll = 0
 		}
@@ -515,28 +517,18 @@ func (m *ProjectPickerModel) renderProjectTable() []string {
 
 	// Find max name width for alignment — cap narrower when two columns are likely
 	// (we compute this before knowing visible count, so use a reasonable cap).
-	nameW := 12 // minimum
-	for _, idx := range m.filtered {
-		entry := m.entries[idx]
-		if len(entry.Project.Name) > nameW {
-			nameW = len(entry.Project.Name)
-		}
-	}
-	if nameW > 20 {
-		nameW = 20
-	}
+	nameW := m.projectNameWidth()
 
 	lines := make([]string, panelRows)
 
 	// Row 0: column headers or filter input
-	const colSep = "  │  "
 	if m.filtering {
 		filterStyle := t.Renderer.NewStyle().Foreground(t.Primary)
 		lines[0] = headerStyle.Render(" > ") + filterStyle.Render(m.filterInput.View())
 	} else {
 		singleHdr := fmt.Sprintf("    %-*s  %3s %3s %3s", nameW, "", "O", "P", "R")
-		if len(m.filtered) > 5 {
-			lines[0] = headerStyle.Render(singleHdr + colSep + fmt.Sprintf("    %-*s  %3s %3s %3s", nameW, "", "O", "P", "R"))
+		if m.projectTableUsesTwoColumns() {
+			lines[0] = headerStyle.Render(singleHdr + projectColumnSeparator + fmt.Sprintf("    %-*s  %3s %3s %3s", nameW, "", "O", "P", "R"))
 		} else {
 			lines[0] = headerStyle.Render(singleHdr)
 		}
@@ -551,7 +543,8 @@ func (m *ProjectPickerModel) renderProjectTable() []string {
 	total := len(m.filtered)
 
 	// Clamp scrollOffset so it never exceeds the valid range.
-	maxScroll := total - maxVisibleProjects
+	visibleCapacity := m.visibleProjectCapacity()
+	maxScroll := total - visibleCapacity
 	if maxScroll < 0 {
 		maxScroll = 0
 	}
@@ -559,15 +552,7 @@ func (m *ProjectPickerModel) renderProjectTable() []string {
 		m.scrollOffset = maxScroll
 	}
 
-	// Number of projects in the current view window.
-	visible := total - m.scrollOffset
-	if visible > maxVisibleProjects {
-		visible = maxVisibleProjects
-	}
-
-	// Use two columns whenever the total list exceeds a single column of 5 entries.
-	// This keeps the layout stable as the user scrolls near the end of a long list.
-	useTwoColumns := total > 5
+	useTwoColumns := m.projectTableUsesTwoColumns()
 	// Number of data rows to fill (always 5 to keep panel height fixed).
 	const dataRows = panelRows - 1 // 5
 
@@ -580,7 +565,7 @@ func (m *ProjectPickerModel) renderProjectTable() []string {
 		// Assign number based on position within visible page (bd-g68w).
 		pagePos := i - m.scrollOffset // 0-based position in visible window
 		numStr := " "
-		if pagePos >= 0 && pagePos < 9 {
+		if pagePos >= 0 && pagePos < visibleCapacity {
 			numStr = fmt.Sprintf("%d", pagePos+1)
 		}
 
@@ -638,11 +623,11 @@ func (m *ProjectPickerModel) renderProjectTable() []string {
 		leftStr := renderRow(leftIdx)
 
 		if useTwoColumns {
-			if rightIdx < total {
-				lines[row+1] = leftStr + colSep + renderRow(rightIdx)
+			if rightIdx < total && rightIdx < startIdx+visibleCapacity {
+				lines[row+1] = leftStr + projectColumnSeparator + renderRow(rightIdx)
 			} else if !allPlaced {
 				// Place <0> All in the empty right column slot
-				lines[row+1] = leftStr + colSep + allEntry
+				lines[row+1] = leftStr + projectColumnSeparator + allEntry
 				allPlaced = true
 			} else {
 				lines[row+1] = leftStr
@@ -657,13 +642,13 @@ func (m *ProjectPickerModel) renderProjectTable() []string {
 	}
 
 	// Scroll indicators in the header row (don't steal data rows).
-	if m.scrollOffset > 0 || total > startIdx+maxVisibleProjects {
+	if m.scrollOffset > 0 || total > startIdx+visibleCapacity {
 		var parts []string
 		if m.scrollOffset > 0 {
 			parts = append(parts, fmt.Sprintf("↑%d", m.scrollOffset))
 		}
-		if total > startIdx+maxVisibleProjects {
-			remaining := total - (startIdx + maxVisibleProjects)
+		if total > startIdx+visibleCapacity {
+			remaining := total - (startIdx + visibleCapacity)
 			parts = append(parts, fmt.Sprintf("↓%d", remaining))
 		}
 		scrollInfo := dimStyle.Render("  " + strings.Join(parts, " "))
@@ -671,6 +656,39 @@ func (m *ProjectPickerModel) renderProjectTable() []string {
 	}
 
 	return lines
+}
+
+func (m *ProjectPickerModel) projectNameWidth() int {
+	nameWidth := 12
+	for _, idx := range m.filtered {
+		if width := len(m.entries[idx].Project.Name); width > nameWidth {
+			nameWidth = width
+		}
+	}
+	if nameWidth > 20 {
+		return 20
+	}
+	return nameWidth
+}
+
+func (m *ProjectPickerModel) projectTableUsesTwoColumns() bool {
+	if len(m.filtered) <= panelRows-1 {
+		return false
+	}
+	width := m.width
+	if width <= 0 {
+		width = 80
+	}
+	nameWidth := m.projectNameWidth()
+	singleColumn := fmt.Sprintf("    %-*s  %3s %3s %3s", nameWidth, "", "O", "P", "R")
+	return lipgloss.Width(singleColumn)*2+lipgloss.Width(projectColumnSeparator) <= width
+}
+
+func (m *ProjectPickerModel) visibleProjectCapacity() int {
+	if m.projectTableUsesTwoColumns() {
+		return maxVisibleProjects
+	}
+	return panelRows - 1
 }
 
 // RenderShortcutsColumn renders two columns of real keybindings (bd-2me).
@@ -835,15 +853,15 @@ func (m *ProjectPickerModel) ScrollOffset() int {
 // This is used by the main model to ensure pressing a number key always selects the project
 // whose on-screen label shows that number (bd-i8t3, bd-8zc).
 func (m *ProjectPickerModel) ProjectByFavoriteNum(n int) *config.Project {
-	if n < 1 || n > 9 {
+	if n < 1 || n > m.visibleProjectCapacity() {
 		return nil
 	}
 	// Map key n to visible page position: scrollOffset + (n-1)
 	idx := m.scrollOffset + (n - 1)
-	if idx < 0 || idx >= len(m.entries) {
+	if idx < 0 || idx >= len(m.filtered) {
 		return nil
 	}
-	p := m.entries[idx].Project
+	p := m.entries[m.filtered[idx]].Project
 	return &p
 }
 
