@@ -24,4 +24,7 @@ export TERM=xterm-256color
 export BW_NO_BROWSER=1
 export BW_TEST_MODE=1
 
-exec ttyd --writable -p 7681 -t disableLeaveAlert=true /usr/local/bin/b9s
+exec ttyd --writable -p 7681 \
+  -t disableLeaveAlert=true \
+  -t 'theme={"background":"#18181b"}' \
+  /usr/local/bin/b9s

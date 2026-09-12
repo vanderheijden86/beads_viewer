@@ -22,6 +22,9 @@ done
 if [[ -f $PREVIEW/Dockerfile ]]; then ok "preview image has a Dockerfile"; else bad "preview image has a Dockerfile"; fi
 if [[ -f $PREVIEW/lib.sh ]]; then ok "preview commands share a contract library"; else bad "preview commands share a contract library"; fi
 
+entrypoint="$(<"$PREVIEW/entrypoint.sh")"
+contains "browser terminal uses the darker preview background" 'theme={"background":"#18181b"}' "$entrypoint"
+
 if [[ $fail -eq 0 ]]; then
   sha="$(git -C "$ROOT" rev-parse HEAD)"
   kubeconfig="$(mktemp)"
