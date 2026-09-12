@@ -2,6 +2,7 @@ package ui_test
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/vanderheijden86/beadwork/pkg/ui"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func createTime(hoursAgo int) time.Time {
@@ -2005,5 +2007,31 @@ func TestBoardCardRectangleRendering(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBoardSelectedCardReappliesBackgroundAfterInnerResets(t *testing.T) {
+	renderer := lipgloss.NewRenderer(io.Discard)
+	renderer.SetColorProfile(termenv.TrueColor)
+	theme := ui.DefaultTheme(renderer)
+	issue := model.Issue{
+		ID:        "bd-yqrq",
+		Title:     "Selected card fills its full area",
+		Status:    model.StatusOpen,
+		Priority:  1,
+		IssueType: model.TypeBug,
+		CreatedAt: createTime(48),
+		UpdatedAt: createTime(24),
+	}
+
+	card := ui.NewBoardModel([]model.Issue{issue}, theme).TestRenderCard(issue, 40, true)
+	backgroundSample := renderer.NewStyle().Background(theme.Highlight).Render(" ")
+	spaceIndex := strings.Index(backgroundSample, " ")
+	if spaceIndex <= 0 {
+		t.Fatalf("expected ANSI background sequence, sample = %q", backgroundSample)
+	}
+	backgroundSequence := backgroundSample[:spaceIndex]
+	if !strings.Contains(card, "\x1b[0m"+backgroundSequence) {
+		t.Fatalf("selected card must restore its background after inner style resets: %q", card)
 	}
 }
